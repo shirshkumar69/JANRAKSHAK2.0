@@ -1,7 +1,27 @@
-flask==3.1.1
-flask-cors==5.0.1
-numpy==2.2.6
-rasterio==1.4.3
-scipy==1.15.3
-requests==2.32.3
-gunicorn==23.0.0
+# JANRAKSHAK Requirements
+
+## Core Requirements
+- Flask-SocketIO for WebSocket real-time updates
+- Chart.js for analytics visualizations
+- Real-time data streaming every 5 seconds
+- Session management and authentication
+- Settings persistence
+
+## Additional Python Dependencies
+```
+flask-socketio
+python-engineio
+python-socketio
+chart.js
+```
+
+## WebSocket Events
+- `connect` - Client connects
+- `disconnect` - Client disconnects
+- `update` - Real-time data push
+- `alert` - Emergency alerts
+
+## Installation Command
+```bash
+pip install flask-socketio python-engineio python-socketio
+```

@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Settings | JANRAKSHAK</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #00d9ff;
+            --primary-dark: #00a8c6;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --success: #2ed573;
+            --dark: #0a0e1a;
+            --dark-light: #141b2d;
+            --dark-lighter: #1e2a3d;
+            --light: #f8fafc;
+            --light-gray: #e8ecf1;
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(255,255,255,0.08);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.15);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.25);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.35);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root:not([data-theme="dark"]) {
+                --dark: #f8fafc;
+                --dark-light: #ffffff;
+                --dark-lighter: #f1f5f9;
+                --text-primary: #0f172a;
+                --text-secondary: #475569;
+                --text-muted: #64748b;
+                --border: rgba(0,0,0,0.08);
+                --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+                --shadow-md: 0 8px 24px rgba(0,0,0,0.12);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .ambient-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.12;
+            animation: float 10s ease-in-out infinite;
+        }
+
+        .glow-1 {
+            top: -100px;
+            right: 10%;
+            background: radial-gradient(circle, var(--primary), var(--primary-dark));
+        }
+
+        .glow-2 {
+            bottom: -150px;
+            left: 15%;
+            background: radial-gradient(circle, var(--danger), var(--warning));
+            animation-delay: 3s;
+        }
+
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(0,217,255,0.06) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Layout */
+        .dashboard {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--dark-light);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .brand {
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--dark);
+            box-shadow: 0 4px 16px rgba(0,217,255,0.3);
+        }
+
+        .brand-text h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-text p {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .nav {
+            flex: 1;
+            padding: 20px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            padding: 0 12px;
+            margin-bottom: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: var(--dark-lighter);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: rgba(0,217,255,0.1);
+            color: var(--primary);
+        }
+
+        .nav-link-icon {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .system-status {
+            background: var(--dark-lighter);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-text {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .status-text strong {
+            display: block;
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            margin-left: 260px;
+            padding: 0;
+        }
+
+        /* Header */
+        .header {
+            background: var(--dark-light);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 32px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(20px);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .header-title h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .header-title p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Content */
+        .content {
+            padding: 32px;
+            max-width: 1400px;
+        }
+
+        /* Settings Grid */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .settings-card {
+            background: var(--dark-light);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .settings-card:hover {
+            border-color: rgba(0,217,255,0.3);
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-icon {
+            font-size: 24px;
+        }
+
+        .card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* User Profile */
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .avatar {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--dark);
+            box-shadow: 0 4px 16px rgba(0,217,255,0.3);
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .profile-email {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .profile-role {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(0,217,255,0.15);
+            color: var(--primary);
+            border: 1px solid rgba(0,217,255,0.3);
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-sublabel {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Slider */
+        .slider-wrapper {
+            margin-bottom: 20px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .slider-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .slider-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary);
+            background: rgba(0,217,255,0.1);
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,217,255,0.2);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--dark-lighter);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,217,255,0.4);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 4px 12px rgba(0,217,255,0.6);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,217,255,0.4);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 4px 12px rgba(0,217,255,0.6);
+        }
+
+        /* Toggle Switch */
+        .toggle-group {
+            margin-bottom: 16px;
+        }
+
+        .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .toggle-item:last-child {
+            border-bottom: none;
+        }
+
+        .toggle-label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            border-radius: 13px;
+        }
+
+        .toggle-slider::before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-muted);
+            transition: all 0.3s ease;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background: rgba(0,217,255,0.2);
+            border-color: var(--primary);
+        }
+
+        input:checked + .toggle-slider::before {
+            background: var(--primary);
+            transform: translateX(22px);
+            box-shadow: 0 0 8px var(--primary);
+        }
+
+        /* Select */
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--dark-lighter);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        select:hover {
+            border-color: var(--primary);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(0,217,255,0.2);
+        }
+
+        /* Button Styles */
+        .btn {
+            padding: 12px 24px;
+            border-radius: var(--radius-sm);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            background: var(--dark-lighter);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(0,217,255,0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--dark);
+            border-color: transparent;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 20px rgba(0,217,255,0.4);
+        }
+
+        .btn-danger {
+            background: rgba(255,71,87,0.15);
+            color: var(--danger);
+            border-color: rgba(255,71,87,0.3);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+        }
+
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Model Equation Display */
+        .equation-display {
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .equation-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .equation {
+            font-family: 'DM Mono', monospace;
+            font-size: 13px;
+            color: var(--text-primary);
+            line-height: 1.8;
+            text-align: center;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: rgba(0,217,255,0.05);
+            border: 1px solid rgba(0,217,255,0.15);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            display: flex;
+            gap: 8px;
+            background: var(--dark-lighter);
+            padding: 4px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+
+        .theme-option {
+            flex: 1;
+            padding: 8px 16px;
+            border-radius: 6px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .theme-option:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .theme-option.active {
+            background: var(--primary);
+            color: var(--dark);
+        }
+
+        /* Status Indicator */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .status-indicator.online {
+            border-color: rgba(46,213,115,0.3);
+        }
+
+        .status-dot-large {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-info {
+            flex: 1;
+        }
+
+        .status-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .status-detail {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* About Section */
+        .about-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .about-item {
+            padding: 12px;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .about-item-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .about-item-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Disclaimer */
+        .disclaimer {
+            background: rgba(255,165,2,0.05);
+            border: 1px solid rgba(255,165,2,0.15);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .disclaimer strong {
+            color: var(--warning);
+            font-weight: 600;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--dark-light);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            transform: translateY(120%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast.success {
+            border-color: rgba(46,213,115,0.3);
+        }
+
+        .toast-icon {
+            font-size: 20px;
+        }
+
+        .toast-message {
+            font-size: 13px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-bg">
+        <div class="ambient-glow glow-1"></div>
+        <div class="ambient-glow glow-2"></div>
+        <div class="grid-pattern"></div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">⌁</div>
+                <div class="brand-text">
+                    <h1>JANRAKSHAK</h1>
+                    <p>Geospatial Intelligence</p>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Monitor</div>
+                    <a href="/dashboard" class="nav-link">
+                        <span class="nav-link-icon">◈</span>
+                        Command Center
+                    </a>
+                    <a href="/terrain" class="nav-link">
+                        <span class="nav-link-icon">⌁</span>
+                        3D Terrain
+                    </a>
+                    <a href="/rainfall" class="nav-link">
+                        <span class="nav-link-icon">◒</span>
+                        Rainfall Data
+                    </a>
+                    <a href="/analytics" class="nav-link">
+                        <span class="nav-link-icon">≋</span>
+                        Analytics
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                    <a href="/reports" class="nav-link">
+                        <span class="nav-link-icon">◫</span>
+                        Reports
+                    </a>
+                    <a href="/settings" class="nav-link active">
+                        <span class="nav-link-icon">⚙</span>
+                        Settings
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <div class="status-dot"></div>
+                    <div class="status-text">
+                        <strong>System Online</strong>
+                        Last sync: Just now
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <header class="header">
+                <div class="header-content">
+                    <div class="header-title">
+                        <h1>Settings</h1>
+                        <p>System configuration and preferences</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                <!-- Row 1: User Profile & Stability Thresholds -->
+                <div class="settings-grid">
+                    <!-- User Profile -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-icon">👤</span>
+                            <div>
+                                <div class="card-title">User Profile</div>
+                                <div class="card-subtitle">Account information</div>
+                            </div>
+                        </div>
+
+                        <div class="profile-header">
+                            <div class="avatar" id="avatarInitials">U</div>
+                            <div class="profile-info">
+                                <div class="profile-name" id="userName">Loading...</div>
+                                <div class="profile-email" id="userEmail">Loading...</div>
+                                <span class="profile-role" id="userRole">Operator</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-danger btn-block" onclick="logout()">
+                            <span>→</span>
+                            Logout
+                        </button>
+                    </div>
+
+                    <!-- Stability Thresholds -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-icon">⚡</span>
+                            <div>
+                                <div class="card-title">Stability Thresholds</div>
+                                <div class="card-subtitle">Physics engine calibration</div>
+                            </div>
+                        </div>
+
+                        <div class="slider-wrapper">
+                            <div class="slider-header">
+                                <span class="slider-label">Unstable Cutoff (FoS)</span>
+                                <span class="slider-value" id="unstableValue">1.00</span>
+                            </div>
+                            <input type="range" id="unstableSlider" min="0.7" max="1.3" step="0.01" value="1.00">
+                            <div class="form-sublabel">Segments below this threshold are classified as UNSTABLE</div>
+                        </div>
+
+                        <div class="slider-wrapper">
+                            <div class="slider-header">
+                                <span class="slider-label">Marginal Cutoff (FoS)</span>
+                                <span class="slider-value" id="marginalValue">1.35</span>
+                            </div>
+                            <input type="range" id="marginalSlider" min="1.1" max="1.8" step="0.01" value="1.35">
+                            <div class="form-sublabel">Segments below this threshold are classified as MARGINAL</div>
+                        </div>
+
+                        <button class="btn btn-primary btn-block" onclick="applyThresholds()">
+                            <span>✓</span>
+                            Apply Thresholds
+                        </button>
+
+                        <div class="equation-display">
+                            <div class="equation-label">Infinite-Slope Model</div>
+                            <div class="equation">FoS = [c' + (γz cos²β − u)tanφ'] / [γz sinβ cosβ]</div>
+                        </div>
+
+                        <div class="info-box">
+                            <strong>Pore Water Pressure:</strong> Green-Ampt infiltration model estimates saturation ratio (m) from rainfall intensity and duration.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Notification Preferences & Display Settings -->
+                <div class="settings-grid">
+                    <!-- Notification Preferences -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-icon">🔔</span>
+                            <div>
+                                <div class="card-title">Notification Preferences</div>
+                                <div class="card-subtitle">Alert and notification settings</div>
+                            </div>
+                        </div>
+
+                        <div class="toggle-group">
+                            <div class="toggle-item">
+                                <span class="toggle-label">Critical Alerts</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="criticalAlerts" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="toggle-item">
+                                <span class="toggle-label">Marginal Warnings</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="marginalWarnings" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="toggle-item">
+                                <span class="toggle-label">Data Sync Notifications</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="dataSyncNotif" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="toggle-item">
+                                <span class="toggle-label">Sound Alerts</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="soundAlerts">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Display Settings -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-icon">🎨</span>
+                            <div>
+                                <div class="card-title">Display Settings</div>
+                                <div class="card-subtitle">Visual preferences</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Theme</label>
+                            <div class="theme-toggle">
+                                <button class="theme-option" data-theme="dark">Dark</button>
+                                <button class="theme-option" data-theme="light">Light</button>
+                                <button class="theme-option active" data-theme="system">System</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="mapLayer">Map Default Layer</label>
+                            <select id="mapLayer">
+                                <option value="satellite" selected>Satellite</option>
+                                <option value="topographic">Topographic</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="refreshInterval">Refresh Interval</label>
+                            <select id="refreshInterval">
+                                <option value="30">30 seconds</option>
+                                <option value="60" selected>1 minute</option>
+                                <option value="300">5 minutes</option>
+                                <option value="0">Manual</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 3: Data & Export and About -->
+                <div class="settings-grid">
+                    <!-- Data & Export -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-icon">💾</span>
+                            <div>
+                                <div class="card-title">Data & Export</div>
+                                <div class="card-subtitle">Export and reporting</div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-block" onclick="exportData()">
+                            <span>↓</span>
+                            Export Current Data
+                        </button>
+
+                        <button class="btn btn-block" onclick="generateBulletin()" style="margin-top: 12px;">
+                            <span>◫</span>
+                            Generate Advisory Bulletin
+                        </button>
+
+                        <div style="margin-top: 20px;">
+                            <label class="form-label">System Health</label>
+                            <div class="status-indicator online" id="systemHealth">
+                                <div class="status-dot-large"></div>
+                                <div class="status-info">
+                                    <div class="status-title">Operational</div>
+                                    <div class="status-detail" id="healthDetail">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- About -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <span class="card-icon">ℹ</span>
+                            <div>
+                                <div class="card-title">About JANRAKSHAK</div>
+                                <div class="card-subtitle">System information</div>
+                            </div>
+                        </div>
+
+                        <div class="about-grid">
+                            <div class="about-item">
+                                <div class="about-item-label">Version</div>
+                                <div class="about-item-value">v2.4.1</div>
+                            </div>
+
+                            <div class="about-item">
+                                <div class="about-item-label">Physics Engine</div>
+                                <div class="about-item-value">Infinite-Slope Active</div>
+                            </div>
+
+                            <div class="about-item">
+                                <div class="about-item-label">DEM Resolution</div>
+                                <div class="about-item-value">30m SRTM</div>
+                            </div>
+
+                            <div class="about-item">
+                                <div class="about-item-label">Data Sources</div>
+                                <div class="about-item-value">Open-Meteo, IMD</div>
+                            </div>
+                        </div>
+
+                        <div class="disclaimer">
+                            <strong>Disclaimer:</strong> JANRAKSHAK is a screening tool for landslide susceptibility assessment. All predictions should be validated with ground-level observations and expert judgment before operational decisions.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-icon">✓</span>
+        <span class="toast-message" id="toastMessage">Settings saved successfully</span>
+    </div>
+
+    <script>
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserProfile();
+            loadThresholds();
+            loadPreferences();
+            loadSystemHealth();
+            initializeThemeToggle();
+        });
+
+        // Load user profile
+        async function loadUserProfile() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+
+                if (data.user) {
+                    document.getElementById('userName').textContent = data.user.name || 'Guest';
+                    document.getElementById('userEmail').textContent = data.user.email || 'guest@janrakshak.local';
+                    document.getElementById('userRole').textContent = data.user.guest ? 'Guest' : 'Operator';
+
+                    // Set avatar initials
+                    const name = data.user.name || 'G';
+                    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    document.getElementById('avatarInitials').textContent = initials;
+                }
+            } catch (error) {
+                console.error('Failed to load user profile:', error);
+            }
+        }
+
+        // Load thresholds
+        async function loadThresholds() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+
+                if (data.thresholds) {
+                    document.getElementById('unstableSlider').value = data.thresholds.unstable;
+                    document.getElementById('unstableValue').textContent = data.thresholds.unstable.toFixed(2);
+
+                    document.getElementById('marginalSlider').value = data.thresholds.marginal;
+                    document.getElementById('marginalValue').textContent = data.thresholds.marginal.toFixed(2);
+                }
+            } catch (error) {
+                console.error('Failed to load thresholds:', error);
+            }
+        }
+
+        // Load preferences from localStorage
+        function loadPreferences() {
+            const preferences = {
+                criticalAlerts: localStorage.getItem('criticalAlerts') !== 'false',
+                marginalWarnings: localStorage.getItem('marginalWarnings') !== 'false',
+                dataSyncNotif: localStorage.getItem('dataSyncNotif') !== 'false',
+                soundAlerts: localStorage.getItem('soundAlerts') === 'true',
+                mapLayer: localStorage.getItem('mapLayer') || 'satellite',
+                refreshInterval: localStorage.getItem('refreshInterval') || '60'
+            };
+
+            document.getElementById('criticalAlerts').checked = preferences.criticalAlerts;
+            document.getElementById('marginalWarnings').checked = preferences.marginalWarnings;
+            document.getElementById('dataSyncNotif').checked = preferences.dataSyncNotif;
+            document.getElementById('soundAlerts').checked = preferences.soundAlerts;
+            document.getElementById('mapLayer').value = preferences.mapLayer;
+            document.getElementById('refreshInterval').value = preferences.refreshInterval;
+        }
+
+        // Load system health
+        async function loadSystemHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    document.getElementById('healthDetail').textContent =
+                        `${data.segments_loaded} segments loaded · DEM ${data.dem_loaded ? 'active' : 'offline'}`;
+                } else {
+                    document.getElementById('healthDetail').textContent = 'System degraded';
+                }
+            } catch (error) {
+                document.getElementById('healthDetail').textContent = 'Unable to connect';
+                console.error('Failed to load system health:', error);
+            }
+        }
+
+        // Slider updates
+        document.getElementById('unstableSlider').addEventListener('input', function(e) {
+            document.getElementById('unstableValue').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+
+        document.getElementById('marginalSlider').addEventListener('input', function(e) {
+            document.getElementById('marginalValue').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+
+        // Apply thresholds
+        async function applyThresholds() {
+            const unstable = parseFloat(document.getElementById('unstableSlider').value);
+            const marginal = parseFloat(document.getElementById('marginalSlider').value);
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        thresholds: { unstable, marginal }
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('Thresholds applied successfully');
+                } else {
+                    showToast('Failed to apply thresholds');
+                }
+            } catch (error) {
+                console.error('Failed to apply thresholds:', error);
+                showToast('Failed to apply thresholds');
+            }
+        }
+
+        // Save notification preferences
+        document.querySelectorAll('#criticalAlerts, #marginalWarnings, #dataSyncNotif, #soundAlerts').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                localStorage.setItem(this.id, this.checked);
+                showToast('Preferences saved');
+            });
+        });
+
+        // Save display settings
+        document.getElementById('mapLayer').addEventListener('change', function() {
+            localStorage.setItem('mapLayer', this.value);
+            showToast('Map layer preference saved');
+        });
+
+        document.getElementById('refreshInterval').addEventListener('change', function() {
+            localStorage.setItem('refreshInterval', this.value);
+            showToast('Refresh interval updated');
+        });
+
+        // Theme toggle
+        function initializeThemeToggle() {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            applyTheme(savedTheme);
+
+            document.querySelectorAll('.theme-option').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.theme === savedTheme) {
+                    btn.classList.add('active');
+                }
+
+                btn.addEventListener('click', function() {
+                    const theme = this.dataset.theme;
+                    localStorage.setItem('theme', theme);
+                    applyTheme(theme);
+
+                    document.querySelectorAll('.theme-option').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    showToast('Theme updated');
+                });
+            });
+        }
+
+        function applyTheme(theme) {
+            const root = document.documentElement;
+            if (theme === 'dark') {
+                root.setAttribute('data-theme', 'dark');
+            } else if (theme === 'light') {
+                root.setAttribute('data-theme', 'light');
+            } else {
+                root.removeAttribute('data-theme');
+            }
+        }
+
+        // Export data
+        async function exportData() {
+            try {
+                const response = await fetch('/api/segments');
+                const data = await response.json();
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `janrakshak-data-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast('Data exported successfully');
+            } catch (error) {
+                console.error('Export failed:', error);
+                showToast('Export failed');
+            }
+        }
+
+        // Generate bulletin
+        function generateBulletin() {
+            window.location.href = '/reports';
+        }
+
+        // Logout
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

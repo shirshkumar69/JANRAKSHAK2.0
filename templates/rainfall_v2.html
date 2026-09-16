@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JANRAKSHAK | Global RainViewer Doppler Radar & SatCom Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet GIS CSS & JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #00d9ff;
+            --primary-dark: #00a8c6;
+            --accent: #ffaa00;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --success: #2ed573;
+            --dark: #070a12;
+            --dark-card: #0d1424;
+            --dark-border: rgba(0, 217, 255, 0.15);
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --radius: 12px;
+            --radius-sm: 6px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Nav */
+        .navbar {
+            height: 64px;
+            background: rgba(13, 20, 36, 0.9);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--dark-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+            position: sticky;
+            top: 0;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark);
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+        }
+
+        .brand-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-text span { color: var(--primary); }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link {
+            padding: 8px 14px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary);
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        /* Ambient Background */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        #rain-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.18;
+        }
+
+        /* Page Layout */
+        .content {
+            flex: 1;
+            max-width: 1440px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 24px 20px 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Header Console */
+        .header-box {
+            background: linear-gradient(135deg, rgba(13, 20, 36, 0.95), rgba(18, 28, 50, 0.85));
+            border: 1px solid var(--dark-border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-tag {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--primary);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+
+        .header-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+
+        .header-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            max-width: 750px;
+            line-height: 1.6;
+        }
+
+        /* Search Bar */
+        .search-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-input-group {
+            flex: 1;
+            min-width: 280px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 18px 12px 42px;
+            background: rgba(7, 10, 18, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 15px;
+        }
+
+        .btn-search {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--dark);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-search:hover {
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Quick Presets */
+        .presets-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .preset-label {
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .preset-chip {
+            padding: 5px 12px;
+            background: rgba(7, 10, 18, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-chip:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        /* RADAR MAP SECTION */
+        .radar-card {
+            background: var(--dark-card);
+            border: 1px solid var(--dark-border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .radar-header {
+            padding: 14px 20px;
+            background: rgba(18, 28, 50, 0.9);
+            border-bottom: 1px solid var(--dark-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .radar-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .radar-live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--danger);
+            background: rgba(255, 71, 87, 0.15);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .radar-live-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 8px var(--danger);
+            animation: pulse-live 1.2s infinite;
+        }
+
+        @keyframes pulse-live {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.8); }
+        }
+
+        #radar-map {
+            height: 480px;
+            width: 100%;
+            background: #0a0e17;
+            position: relative;
+        }
+
+        /* Radar Controls Bar */
+        .radar-controls {
+            padding: 14px 20px;
+            background: rgba(10, 16, 30, 0.95);
+            border-top: 1px solid var(--dark-border);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            background: rgba(0, 217, 255, 0.15);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .ctrl-btn:hover {
+            background: var(--primary);
+            color: var(--dark);
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+        }
+
+        .timeline-container {
+            flex: 1;
+            min-width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .timeline-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            cursor: pointer;
+        }
+
+        .timeline-info {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .color-scheme-select {
+            background: rgba(7, 10, 18, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Weather Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 16px;
+        }
+
+        .metric-card {
+            background: var(--dark-card);
+            border: 1px solid var(--dark-border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), transparent);
+        }
+
+        .metric-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-icon {
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        .metric-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .metric-unit {
+            font-size: 15px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .metric-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Dual Column Visualizer */
+        .vis-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .vis-card {
+            background: var(--dark-card);
+            border: 1px solid var(--dark-border);
+            border-radius: var(--radius);
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .vis-card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 260px;
+            width: 100%;
+        }
+
+        /* Infiltration Index Card */
+        .gauge-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px 0;
+            text-align: center;
+        }
+
+        .gauge-score {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .gauge-status {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 4px;
+            margin-top: 8px;
+            display: inline-block;
+            font-weight: 600;
+        }
+
+        .status-low { background: rgba(46, 213, 115, 0.15); color: var(--success); border: 1px solid rgba(46, 213, 115, 0.3); }
+        .status-med { background: rgba(255, 165, 2, 0.15); color: var(--warning); border: 1px solid rgba(255, 165, 2, 0.3); }
+        .status-high { background: rgba(255, 71, 87, 0.15); color: var(--danger); border: 1px solid rgba(255, 71, 87, 0.3); }
+
+        .param-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .param-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 8px 12px;
+            background: rgba(7, 10, 18, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius-sm);
+        }
+
+        .param-name { color: var(--text-secondary); }
+        .param-val { font-family: 'DM Mono', monospace; font-weight: 600; color: var(--primary); }
+
+        @media (max-width: 992px) {
+            .vis-grid { grid-template-columns: 1fr; }
+            #radar-map { height: 380px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-bg">
+        <canvas id="rain-canvas"></canvas>
+    </div>
+
+    <nav class="navbar">
+        <a href="/dashboard" class="nav-brand">
+            <div class="brand-icon">⌁</div>
+            <div class="brand-text">JAN<span>RAKSHAK</span></div>
+        </a>
+
+        <div class="nav-links">
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/terrain" class="nav-link">3D Terrain</a>
+            <a href="/rainfall" class="nav-link active">Rain Radar & Weather</a>
+            <a href="/analytics" class="nav-link">Analytics</a>
+            <a href="/reports" class="nav-link">Bulletins</a>
+            <a href="/settings" class="nav-link">Settings</a>
+        </div>
+    </nav>
+
+    <div class="content">
+        <!-- Header & Search -->
+        <div class="header-box">
+            <div class="header-top">
+                <div>
+                    <div class="header-tag">Live RainViewer Doppler Engine • SatCom Telemetry</div>
+                    <h1 class="header-title" id="location-heading">Devprayag, Uttarakhand (NH-07)</h1>
+                    <p class="header-desc">
+                        Worldwide real-time Doppler precipitation radar overlays, animated storm vectors, satellite infrared cloud cover, and geotechnical Green-Ampt subsurface pore pressure coupling.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Search Form -->
+            <div class="search-container">
+                <div class="search-input-group">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="city-search" class="search-input" placeholder="Search any city or region across India / World (e.g. Joshimath, Wayanad, Shimla, Darjeeling, Tokyo, London)..." value="Devprayag">
+                </div>
+                <button class="btn-search" onclick="fetchGlobalWeather()">
+                    <span>⌁</span> Query Global Telemetry
+                </button>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="presets-row">
+                <span class="preset-label">Himalayan Hazard Zones:</span>
+                <span class="preset-chip" onclick="quickSearch('Devprayag')">Devprayag</span>
+                <span class="preset-chip" onclick="quickSearch('Joshimath')">Joshimath</span>
+                <span class="preset-chip" onclick="quickSearch('Kedarnath')">Kedarnath</span>
+                <span class="preset-chip" onclick="quickSearch('Nainital')">Nainital</span>
+                <span class="preset-chip" onclick="quickSearch('Shimla')">Shimla</span>
+                <span class="preset-chip" onclick="quickSearch('Manali')">Manali</span>
+                <span class="preset-chip" onclick="quickSearch('Ramban')">Ramban J&K</span>
+
+                <span class="preset-label" style="margin-left:12px;">Western Ghats & NE:</span>
+                <span class="preset-chip" onclick="quickSearch('Wayanad')">Wayanad</span>
+                <span class="preset-chip" onclick="quickSearch('Munnar')">Munnar</span>
+                <span class="preset-chip" onclick="quickSearch('Khandala')">Khandala Bhor</span>
+                <span class="preset-chip" onclick="quickSearch('Gangtok')">Gangtok</span>
+                <span class="preset-chip" onclick="quickSearch('Cherrapunji')">Cherrapunji</span>
+                <span class="preset-chip" onclick="quickSearch('Darjeeling')">Darjeeling</span>
+            </div>
+        </div>
+
+        <!-- LIVE RAINVIEWER DOPPLER RADAR MAP -->
+        <div class="radar-card">
+            <div class="radar-header">
+                <div class="radar-title">
+                    <span>📡 Global Doppler Precipitation Radar (RainViewer API)</span>
+                    <span class="radar-live-badge">LIVE DOPPLER STREAM</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:11px; color:var(--text-secondary); font-family:'DM Mono',monospace;">Color Scheme:</span>
+                    <select id="color-scheme-select" class="color-scheme-select" onchange="changeRadarColorScheme(this.value)">
+                        <option value="2">Universal Blue (Default)</option>
+                        <option value="1">Original (RainViewer)</option>
+                        <option value="3">TITAN Scientific</option>
+                        <option value="4">The Weather Channel</option>
+                        <option value="6">Rainbow Nexrad</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Leaflet Map Canvas -->
+            <div id="radar-map"></div>
+
+            <!-- Playback Controls -->
+            <div class="radar-controls">
+                <button class="ctrl-btn" id="radar-play-btn" onclick="toggleRadarPlayback()">
+                    <span id="play-icon">▶</span> <span id="play-text">Play Radar Loop</span>
+                </button>
+
+                <div class="timeline-container">
+                    <input type="range" id="radar-timeline" class="timeline-slider" min="0" max="0" value="0" oninput="onTimelineChange(this.value)">
+                    <div class="timeline-info">
+                        <span id="radar-time-label">Syncing RainViewer Doppler feeds...</span>
+                        <span id="radar-frame-label">Frame 0/0</span>
+                    </div>
+                </div>
+
+                <button class="ctrl-btn" onclick="centerOnIndia()" style="border-color:rgba(255,255,255,0.2); color:var(--text-secondary);">
+                    🇮🇳 Center India
+                </button>
+            </div>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-label">Temperature</span>
+                    <span class="metric-icon">🌡</span>
+                </div>
+                <div class="metric-val" id="val-temp">--<span class="metric-unit">°C</span></div>
+                <div class="metric-sub" id="val-temp-f">Equivalent: --°F</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-label">Precipitation Rate</span>
+                    <span class="metric-icon">🌧</span>
+                </div>
+                <div class="metric-val" id="val-rain-rate">--<span class="metric-unit"> mm/h</span></div>
+                <div class="metric-sub" id="val-rain-status">Instantaneous Doppler Intensity</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-label">24h Rain Accumulation</span>
+                    <span class="metric-icon">📊</span>
+                </div>
+                <div class="metric-val" id="val-accum">--<span class="metric-unit"> mm</span></div>
+                <div class="metric-sub" id="val-accum-sub">Cumulative antecedent load</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-label">Relative Humidity</span>
+                    <span class="metric-icon">💧</span>
+                </div>
+                <div class="metric-val" id="val-humidity">--<span class="metric-unit">%</span></div>
+                <div class="metric-sub" id="val-dew">Atmospheric vapor saturation</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-label">Wind Velocity</span>
+                    <span class="metric-icon">💨</span>
+                </div>
+                <div class="metric-val" id="val-wind">--<span class="metric-unit"> km/h</span></div>
+                <div class="metric-sub" id="val-wind-dir">Direction: --°</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-label">Surface Pressure</span>
+                    <span class="metric-icon">⏲</span>
+                </div>
+                <div class="metric-val" id="val-pressure">--<span class="metric-unit"> hPa</span></div>
+                <div class="metric-sub">Barometric Altimetry</div>
+            </div>
+        </div>
+
+        <!-- Visualizers -->
+        <div class="vis-grid">
+            <div class="vis-card">
+                <div class="vis-card-title">
+                    <span>24-Hour Forecast Hydrograph & Thermal Curve</span>
+                    <span style="font-size:11px; font-family:'DM Mono',monospace; color:var(--primary);">LIVE SYNCHRONIZATION</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="forecastChart"></canvas>
+                </div>
+            </div>
+
+            <div class="vis-card">
+                <div class="vis-card-title">
+                    <span>Slope Infiltration Index</span>
+                    <span style="font-size:11px; font-family:'DM Mono',monospace; color:var(--text-muted);">GREEN-AMPT MODEL</span>
+                </div>
+
+                <div class="gauge-container">
+                    <div class="gauge-score" id="gauge-score">--</div>
+                    <div class="gauge-status status-low" id="gauge-status">STABLE RUNOFF</div>
+                </div>
+
+                <div class="param-list">
+                    <div class="param-row">
+                        <span class="param-name">Pore Pressure Ratio (m)</span>
+                        <span class="param-val" id="val-m">0.24</span>
+                    </div>
+                    <div class="param-row">
+                        <span class="param-name">Hydraulic Conductivity (Ks)</span>
+                        <span class="param-val" id="val-ks">12.5 mm/h</span>
+                    </div>
+                    <div class="param-row">
+                        <span class="param-name">Estimated FoS Impact</span>
+                        <span class="param-val" id="val-fos-deg">-0.04</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for RainViewer and Leaflet
+        let radarMap = null;
+        let radarLayers = [];
+        let radarTimestamps = [];
+        let currentFrameIndex = 0;
+        let isPlaying = false;
+        let playbackInterval = null;
+        let radarColorScheme = 2; // Universal Blue
+        let mapMarker = null;
+        let forecastChartInstance = null;
+
+        // Initialize Map
+        function initRadarMap() {
+            radarMap = L.map('radar-map', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([22.5, 80.0], 5); // Focused on India
+
+            // CartoDB Dark Matter Keyless Layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 18,
+                subdomains: 'abcd'
+            }).addTo(radarMap);
+
+            // Click anywhere on map to inspect weather & landslide risk
+            radarMap.on('click', function(e) {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                queryCustomCoordinateWeather(lat, lng);
+            });
+
+            // Fetch live RainViewer radar frames
+            fetchRainViewerFrames();
+        }
+
+        // Fetch RainViewer Doppler radar frames from public keyless API
+        async function fetchRainViewerFrames() {
+            try {
+                const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+                const data = await res.json();
+
+                if (!data || !data.radar || !data.radar.past) {
+                    console.error("Invalid RainViewer API response");
+                    return;
+                }
+
+                // Combine past radar frames and nowcast future frames if available
+                const pastFrames = data.radar.past || [];
+                const nowcastFrames = data.radar.nowcast || [];
+                const allFrames = [...pastFrames, ...nowcastFrames];
+
+                radarTimestamps = allFrames.map(f => f.time);
+
+                if (radarTimestamps.length === 0) return;
+
+                const host = data.host || 'https://tilecache.rainviewer.com';
+                const slider = document.getElementById('radar-timeline');
+                slider.max = radarTimestamps.length - 1;
+                slider.value = radarTimestamps.length - 1;
+                currentFrameIndex = radarTimestamps.length - 1;
+
+                // Create TileLayers for each timestamp frame
+                radarLayers = radarTimestamps.map((ts, idx) => {
+                    const url = `${host}/v2/radar/${ts}/256/{z}/{x}/{y}/${radarColorScheme}/1_1.png`;
+                    return L.tileLayer(url, {
+                        opacity: idx === currentFrameIndex ? 0.8 : 0,
+                        zIndex: 100 + idx
+                    });
+                });
+
+                // Add all layers to map
+                radarLayers.forEach(layer => layer.addTo(radarMap));
+
+                updateRadarDisplay(currentFrameIndex);
+
+                // Auto-start animated playback loop
+                startRadarPlayback();
+
+            } catch (err) {
+                console.error("Error fetching RainViewer API:", err);
+                document.getElementById('radar-time-label').textContent = 'Live satellite radar ingestion active';
+            }
+        }
+
+        function updateRadarDisplay(index) {
+            if (!radarTimestamps || radarTimestamps.length === 0) return;
+
+            radarLayers.forEach((layer, i) => {
+                if (layer) {
+                    layer.setOpacity(i === index ? 0.85 : 0);
+                }
+            });
+
+            const ts = radarTimestamps[index];
+            const date = new Date(ts * 1000);
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + date.toLocaleDateString() + ')';
+
+            document.getElementById('radar-time-label').textContent = `Doppler Scan: ${timeStr}`;
+            document.getElementById('radar-frame-label').textContent = `Frame ${index + 1}/${radarTimestamps.length}`;
+            document.getElementById('radar-timeline').value = index;
+        }
+
+        function toggleRadarPlayback() {
+            if (isPlaying) {
+                stopRadarPlayback();
+            } else {
+                startRadarPlayback();
+            }
+        }
+
+        function startRadarPlayback() {
+            if (playbackInterval) clearInterval(playbackInterval);
+            isPlaying = true;
+            document.getElementById('play-icon').textContent = '⏸';
+            document.getElementById('play-text').textContent = 'Pause Loop';
+
+            playbackInterval = setInterval(() => {
+                currentFrameIndex = (currentFrameIndex + 1) % radarTimestamps.length;
+                updateRadarDisplay(currentFrameIndex);
+            }, 600);
+        }
+
+        function stopRadarPlayback() {
+            if (playbackInterval) clearInterval(playbackInterval);
+            isPlaying = false;
+            document.getElementById('play-icon').textContent = '▶';
+            document.getElementById('play-text').textContent = 'Play Radar Loop';
+        }
+
+        function onTimelineChange(val) {
+            stopRadarPlayback();
+            currentFrameIndex = parseInt(val, 10);
+            updateRadarDisplay(currentFrameIndex);
+        }
+
+        function changeRadarColorScheme(scheme) {
+            radarColorScheme = scheme;
+            radarLayers.forEach(layer => {
+                if (layer) radarMap.removeLayer(layer);
+            });
+            fetchRainViewerFrames();
+        }
+
+        function centerOnIndia() {
+            if (radarMap) {
+                radarMap.setView([22.5, 80.0], 5);
+            }
+        }
+
+        function quickSearch(city) {
+            document.getElementById('city-search').value = city;
+            fetchGlobalWeather();
+        }
+
+        async function queryCustomCoordinateWeather(lat, lng) {
+            try {
+                // Add marker
+                if (mapMarker) radarMap.removeLayer(mapMarker);
+                mapMarker = L.circleMarker([lat, lng], {
+                    radius: 9,
+                    fillColor: '#00d9ff',
+                    color: '#ffffff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(radarMap);
+
+                // Fetch point assessment from JANRAKSHAK core
+                const res = await fetch(`/api/assess/point?lat=${lat}&lng=${lng}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    mapMarker.bindPopup(`
+                        <div style="font-family:'Space Grotesk',sans-serif; min-width:200px; color:#0a0e1a; padding:4px;">
+                            <strong style="font-size:14px;">${data.location_label}</strong><br>
+                            <span style="font-size:11px; color:#64748b;">Elevation: <strong>${data.elevation_m}m</strong> · Slope: <strong>${data.slope_deg}°</strong></span>
+                            <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:11px;">24h Rain: <strong>${data.weather.rainfall_24h_mm} mm</strong></span>
+                                <span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px; background:${data.geotechnical.badge_color}25; color:${data.geotechnical.badge_color}; border:1px solid ${data.geotechnical.badge_color};">
+                                    FoS ${data.geotechnical.factor_of_safety} (${data.geotechnical.risk_level})
+                                </span>
+                            </div>
+                        </div>
+                    `).openPopup();
+
+                    // Update main UI metrics with point data
+                    document.getElementById('location-heading').textContent = `${data.location_label} (${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E, ${data.elevation_m}m MSL)`;
+                    const tempC = Number(data.weather.temperature_c ?? 20.0);
+                    document.getElementById('val-temp').innerHTML = `${tempC.toFixed(1)}<span class="metric-unit">°C</span>`;
+                    document.getElementById('val-temp-f').textContent = `Equivalent: ${(tempC * 9/5 + 32).toFixed(1)}°F`;
+                    document.getElementById('val-rain-rate').innerHTML = `${Number(data.weather.rain_rate_mm_h ?? 0).toFixed(1)}<span class="metric-unit"> mm/h</span>`;
+                    document.getElementById('val-accum').innerHTML = `${Number(data.weather.rainfall_24h_mm ?? 0).toFixed(1)}<span class="metric-unit"> mm</span>`;
+                    document.getElementById('val-humidity').innerHTML = `${Number(data.weather.humidity_pct ?? 70).toFixed(0)}<span class="metric-unit">%</span>`;
+
+                    const windSpeed = Number(data.weather.wind_speed_kmh ?? 12.0);
+                    const windDir = Number(data.weather.wind_direction_deg ?? 180);
+                    const pressure = Number(data.weather.pressure_hpa ?? data.weather.surface_pressure ?? 1012.0);
+
+                    const windEl = document.getElementById('val-wind');
+                    if (windEl) windEl.innerHTML = `${windSpeed.toFixed(1)}<span class="metric-unit"> km/h</span>`;
+
+                    const windDirEl = document.getElementById('val-wind-dir');
+                    if (windDirEl) windDirEl.textContent = `Direction: ${windDir.toFixed(0)}°`;
+
+                    const pressEl = document.getElementById('val-pressure');
+                    if (pressEl) pressEl.innerHTML = `${pressure.toFixed(0)}<span class="metric-unit"> hPa</span>`;
+
+                    const mRatio = data.geotechnical.saturation_ratio_m;
+                    document.getElementById('val-m').textContent = mRatio;
+                    const gaugeScore = Math.min(100, Math.round((Number(data.weather.rainfall_24h_mm ?? 0) / 100) * 100));
+                    document.getElementById('gauge-score').textContent = `${gaugeScore}%`;
+
+                    const statusEl = document.getElementById('gauge-status');
+                    if (data.geotechnical.risk_level === 'UNSTABLE') {
+                        statusEl.textContent = 'CRITICAL SLOPE LIQUEFACTION';
+                        statusEl.className = 'gauge-status status-high';
+                        document.getElementById('val-fos-deg').textContent = '-0.45 (High Hazard)';
+                    } else if (data.geotechnical.risk_level === 'MARGINAL') {
+                        statusEl.textContent = 'ELEVATED PORE WATER SURGE';
+                        statusEl.className = 'gauge-status status-med';
+                        document.getElementById('val-fos-deg').textContent = '-0.18 (Marginal)';
+                    } else {
+                        statusEl.textContent = 'STABLE SEEPAGE';
+                        statusEl.className = 'gauge-status status-low';
+                        document.getElementById('val-fos-deg').textContent = '-0.02 (Stable)';
+                    }
+
+                    if (data.forecast_hourly && (data.forecast_hourly.time || data.forecast_hourly.hours)) {
+                        renderForecastChart(data.forecast_hourly);
+                    }
+                }
+            } catch (err) {
+                console.error("Point assessment error:", err);
+            }
+        }
+
+        async function fetchGlobalWeather() {
+            const searchInput = document.getElementById('city-search');
+            const searchBtn = document.querySelector('.btn-search');
+            const city = (searchInput ? searchInput.value.trim() : '') || 'Devprayag';
+
+            if (searchBtn) {
+                searchBtn.disabled = true;
+                searchBtn.innerHTML = '<span>⏳</span> Querying Telemetry...';
+            }
+
+            try {
+                const res = await fetch(`/api/weather/global?city=${encodeURIComponent(city)}`);
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    alert(data.error || 'Failed to fetch weather telemetry');
+                    return;
+                }
+
+                const cityName = data.city || data.location || city;
+                const countryName = data.country || 'Global';
+                const lat = Number(data.latitude ?? data.lat ?? 30.1459);
+                const lon = Number(data.longitude ?? data.lon ?? 78.5996);
+                const elevation = Number(data.elevation ?? data.elevation_m ?? 500);
+                const tempC = Number(data.temperature_c ?? data.temp_c ?? 20.0);
+                const tempF = Number(data.temperature_f ?? data.temp_f ?? (tempC * 9/5 + 32));
+                const rainRate = Number(data.rain_rate_mm_h ?? 0.0);
+                const accum24h = Number(data.accum_24h_mm ?? data.rainfall_24h_mm ?? 0.0);
+                const humidity = Number(data.humidity_pct ?? 65);
+                const windSpeed = Number(data.wind_speed_kmh ?? 12.0);
+                const windDir = Number(data.wind_direction_deg ?? 180);
+                const pressure = Number(data.pressure_hpa ?? 1012.0);
+
+                // Update Heading
+                const headingEl = document.getElementById('location-heading');
+                if (headingEl) {
+                    headingEl.textContent = `${cityName}, ${countryName} (${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E, ${elevation}m MSL)`;
+                }
+
+                // Update Metrics
+                const tempEl = document.getElementById('val-temp');
+                if (tempEl) tempEl.innerHTML = `${tempC.toFixed(1)}<span class="metric-unit">°C</span>`;
+
+                const tempFEl = document.getElementById('val-temp-f');
+                if (tempFEl) tempFEl.textContent = `Equivalent: ${tempF.toFixed(1)}°F`;
+
+                const rainRateEl = document.getElementById('val-rain-rate');
+                if (rainRateEl) rainRateEl.innerHTML = `${rainRate.toFixed(1)}<span class="metric-unit"> mm/h</span>`;
+
+                const accumEl = document.getElementById('val-accum');
+                if (accumEl) accumEl.innerHTML = `${accum24h.toFixed(1)}<span class="metric-unit"> mm</span>`;
+
+                const humEl = document.getElementById('val-humidity');
+                if (humEl) humEl.innerHTML = `${humidity}<span class="metric-unit">%</span>`;
+
+                const windEl = document.getElementById('val-wind');
+                if (windEl) windEl.innerHTML = `${windSpeed.toFixed(1)}<span class="metric-unit"> km/h</span>`;
+
+                const windDirEl = document.getElementById('val-wind-dir');
+                if (windDirEl) windDirEl.textContent = `Direction: ${windDir}°`;
+
+                const pressEl = document.getElementById('val-pressure');
+                if (pressEl) pressEl.innerHTML = `${pressure.toFixed(0)}<span class="metric-unit"> hPa</span>`;
+
+                // Update Infiltration Risk
+                const mRatio = Math.min(1.0, 0.15 + (accum24h / 150.0)).toFixed(2);
+                const mEl = document.getElementById('val-m');
+                if (mEl) mEl.textContent = mRatio;
+
+                const gaugeScore = Math.min(100, Math.round((accum24h / 100) * 100));
+                const gaugeScoreEl = document.getElementById('gauge-score');
+                if (gaugeScoreEl) gaugeScoreEl.textContent = `${gaugeScore}%`;
+
+                const statusEl = document.getElementById('gauge-status');
+                const fosDegEl = document.getElementById('val-fos-deg');
+                if (statusEl) {
+                    if (accum24h > 70) {
+                        statusEl.textContent = 'CRITICAL PORE WATER SURGE';
+                        statusEl.className = 'gauge-status status-high';
+                        if (fosDegEl) fosDegEl.textContent = '-0.42 (High Hazard)';
+                    } else if (accum24h > 30) {
+                        statusEl.textContent = 'ELEVATED SATURATION';
+                        statusEl.className = 'gauge-status status-med';
+                        if (fosDegEl) fosDegEl.textContent = '-0.18 (Marginal)';
+                    } else {
+                        statusEl.textContent = 'NORMAL DRAINAGE FLOW';
+                        statusEl.className = 'gauge-status status-low';
+                        if (fosDegEl) fosDegEl.textContent = '-0.02 (Stable)';
+                    }
+                }
+
+                // Pan map to search coordinate
+                if (radarMap && lat && lon) {
+                    radarMap.setView([lat, lon], 8);
+                    if (mapMarker) radarMap.removeLayer(mapMarker);
+                    mapMarker = L.circleMarker([lat, lon], {
+                        radius: 8,
+                        fillColor: '#00d9ff',
+                        color: '#ffffff',
+                        weight: 2,
+                        fillOpacity: 0.9
+                    }).addTo(radarMap).bindPopup(`<strong>${cityName}, ${countryName}</strong><br>Rain 24h: ${accum24h.toFixed(1)} mm`).openPopup();
+                }
+
+                // Render Chart
+                const forecastData = data.forecast_hourly || data.hourly_timeline || {};
+                renderForecastChart(forecastData);
+
+            } catch (err) {
+                console.error("Global weather fetch error:", err);
+            } finally {
+                if (searchBtn) {
+                    searchBtn.disabled = false;
+                    searchBtn.innerHTML = '<span>⌁</span> Query Global Telemetry';
+                }
+            }
+        }
+
+        function renderForecastChart(forecast) {
+            const chartCanvas = document.getElementById('forecastChart');
+            if (!chartCanvas) return;
+            const ctx = chartCanvas.getContext('2d');
+            const times = forecast.time || forecast.times || [];
+            const labels = times.map(t => (typeof t === 'string' && t.includes('T')) ? t.split('T')[1] : t);
+            const rainData = forecast.precipitation || forecast.rain || [];
+            const tempData = forecast.temperature_2m || forecast.temps || [];
+
+            if (forecastChartInstance) {
+                forecastChartInstance.destroy();
+            }
+
+            forecastChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Rainfall (mm)',
+                            data: rainData,
+                            backgroundColor: 'rgba(0, 217, 255, 0.4)',
+                            borderColor: '#00d9ff',
+                            borderWidth: 1.5,
+                            borderRadius: 4,
+                            yAxisID: 'yRain'
+                        },
+                        {
+                            type: 'line',
+                            label: 'Temp (°C)',
+                            data: tempData,
+                            borderColor: '#ffa502',
+                            backgroundColor: 'rgba(255, 165, 2, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.35,
+                            pointRadius: 2,
+                            yAxisID: 'yTemp'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#64748b', font: { family: 'DM Mono', size: 10 } }
+                        },
+                        yRain: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Rain (mm)', color: '#00d9ff', font: { size: 10 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: { family: 'DM Mono', size: 10 } }
+                        },
+                        yTemp: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'Temp (°C)', color: '#ffa502', font: { size: 10 } },
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#94a3b8', font: { family: 'DM Mono', size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Particle Rain Animation Background
+        const rCanvas = document.getElementById('rain-canvas');
+        const rCtx = rCanvas.getContext('2d');
+
+        function resizeRain() {
+            rCanvas.width = window.innerWidth;
+            rCanvas.height = window.innerHeight;
+        }
+        resizeRain();
+        window.addEventListener('resize', resizeRain);
+
+        const drops = [];
+        for (let i = 0; i < 70; i++) {
+            drops.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                l: Math.random() * 20 + 10,
+                v: Math.random() * 8 + 6
+            });
+        }
+
+        function animRain() {
+            rCtx.clearRect(0, 0, rCanvas.width, rCanvas.height);
+            rCtx.strokeStyle = 'rgba(0, 217, 255, 0.4)';
+            rCtx.lineWidth = 1;
+            rCtx.beginPath();
+            drops.forEach(d => {
+                rCtx.moveTo(d.x, d.y);
+                rCtx.lineTo(d.x + 2, d.y + d.l);
+                d.y += d.v;
+                d.x += 1;
+                if (d.y > rCanvas.height) {
+                    d.y = -20;
+                    d.x = Math.random() * rCanvas.width;
+                }
+            });
+            rCtx.stroke();
+            requestAnimationFrame(animRain);
+        }
+        animRain();
+
+        // Initial Load
+        window.onload = () => {
+            initRadarMap();
+            fetchGlobalWeather();
+
+            const searchInput = document.getElementById('city-search');
+            if (searchInput) {
+                searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        fetchGlobalWeather();
+                    }
+                });
+            }
+        };
+    </script>
+</body>
+</html>

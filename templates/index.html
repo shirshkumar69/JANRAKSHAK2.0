@@ -318,8 +318,9 @@
             </div>
 
             <!-- RAINFALL TELEMETRY VIEW -->
-            <div id="view-rainfall" class="view-section hidden">
-                <header>
+            <div id="view-rainfall" class="view-section hidden" style="position: relative; overflow: hidden;">
+                <canvas id="ambient-rain-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.25; z-index: 0;"></canvas>
+                <header style="position: relative; z-index: 1;">
                     <div class="header-titles">
                         <div class="eyebrow"><span class="status-indicator"></span> OPEN-METEO SATCOM</div>
                         <h1>Infiltration & Precipitation Telemetry<span>.</span></h1>
@@ -592,7 +593,28 @@
         </div>
     </div>
 
+    <!-- Rainfall Telemetry Dedicated Landing Overlay -->
+    <div id="rainfall-landing" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:radial-gradient(circle at center, #07111e 0%, #010409 100%); z-index:99998; display:none; flex-direction:column; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s ease;">
+        <canvas id="splash-rain-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></canvas>
+        <div class="glass-panel" style="position:relative; z-index:10; max-width:620px; width:90%; padding:40px; text-align:center; border:1px solid rgba(0, 242, 254, 0.3); box-shadow:0 0 50px rgba(0, 242, 254, 0.15), 0 20px 40px rgba(0, 0, 0, 0.8); background:rgba(6, 10, 20, 0.88); backdrop-filter:blur(16px); border-radius:12px; animation:slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);">
+            <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(0, 242, 254, 0.1); border:1px solid rgba(0, 242, 254, 0.25); padding:6px 14px; border-radius:20px; font-size:11px; font-family:'DM Mono',monospace; color:var(--accent-cyan); margin-bottom:18px;">
+                <span class="status-indicator live"></span> SATELLITE HYDROMETEOROLOGY FEED
+            </div>
+            <h1 style="font-size:28px; font-weight:700; margin-bottom:12px; letter-spacing:-0.5px; background:linear-gradient(135deg, #ffffff 0%, #00f2fe 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+                Rainfall & Infiltration Telemetry
+            </h1>
+            <p style="color:var(--text-secondary); font-size:13px; line-height:1.6; margin-bottom:28px;">
+                High-resolution hyetograph telemetry, real-time subsurface pore water pressure modeling, and 72-hour precipitation intensity tracking across NH-07 Himalayan sectors.
+            </p>
+            <div style="display:flex; justify-content:center; gap:16px;">
+                <button id="activate-telemetry-btn" class="refresh-btn" style="background:var(--accent-cyan); color:#060913; border:none; padding:12px 28px; border-radius:8px; cursor:pointer; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.5px; box-shadow:0 0 20px rgba(0, 242, 254, 0.4); display:inline-flex; align-items:center; gap:8px; transition:all 0.2s ease;">
+                    <span>🌧️</span> ACTIVATE TELEMETRY & AUDIO
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Application Script -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=12"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=25"></script>
 </body>
 </html>

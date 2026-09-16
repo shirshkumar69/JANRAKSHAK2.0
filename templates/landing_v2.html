@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JANRAKSHAK | Himalayan Slope Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #00d9ff;
+            --primary-dark: #00a8c6;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --success: #2ed573;
+            --dark: #0a0e1a;
+            --dark-light: #141b2d;
+            --dark-lighter: #1e2a3d;
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(255,255,255,0.08);
+            --shadow: 0 20px 60px rgba(0,0,0,0.4);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root:not([data-theme="dark"]) {
+                --dark: #f8fafc;
+                --dark-light: #ffffff;
+                --dark-lighter: #f1f5f9;
+                --text-primary: #0f172a;
+                --text-secondary: #475569;
+                --border: rgba(0,0,0,0.08);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .ambient-glow {
+            position: absolute;
+            width: 800px;
+            height: 800px;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.08;
+        }
+
+        .glow-1 {
+            top: -300px;
+            right: -200px;
+            background: radial-gradient(circle, var(--primary), transparent);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .glow-2 {
+            bottom: -400px;
+            left: -300px;
+            background: radial-gradient(circle, var(--danger), var(--warning), transparent);
+            animation: float 25s ease-in-out infinite reverse;
+        }
+
+        .glow-3 {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 1200px;
+            height: 1200px;
+            background: radial-gradient(circle, rgba(0,217,255,0.03), transparent 70%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(0,217,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 20px 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(10,14,26,0.9), transparent);
+            backdrop-filter: blur(20px);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-logo {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--dark);
+            box-shadow: 0 4px 16px rgba(0,217,255,0.3);
+        }
+
+        .nav-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .nav-name span {
+            color: var(--primary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-cta {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            background: var(--dark-light);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(0,217,255,0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--dark);
+            border-color: transparent;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 8px 32px rgba(0,217,255,0.4);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 140px 60px 80px;
+            position: relative;
+        }
+
+        .hero-content {
+            max-width: 900px;
+            text-align: center;
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(0,217,255,0.1);
+            border: 1px solid rgba(0,217,255,0.2);
+            border-radius: 50px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: 'DM Mono', monospace;
+            color: var(--primary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 32px;
+        }
+
+        .hero-badge-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .hero-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(40px, 7vw, 72px);
+            font-weight: 700;
+            line-height: 1.05;
+            margin-bottom: 24px;
+            letter-spacing: -2px;
+        }
+
+        .hero-title span {
+            display: block;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-description {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 48px;
+            line-height: 1.7;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 80px;
+        }
+
+        .btn-large {
+            padding: 18px 36px;
+            font-size: 15px;
+            border-radius: var(--radius-sm);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        .scroll-indicator-icon {
+            width: 24px;
+            height: 40px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .scroll-indicator-icon::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 2px;
+            animation: scroll 2s ease-in-out infinite;
+        }
+
+        /* Stats Section */
+        .stats-section {
+            padding: 100px 60px;
+            background: var(--dark-light);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 60px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 56px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 12px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Features Section */
+        .features-section {
+            padding: 120px 60px;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 80px;
+        }
+
+        .section-eyebrow {
+            font-size: 11px;
+            font-weight: 600;
+            font-family: 'DM Mono', monospace;
+            color: var(--primary);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+        }
+
+        .section-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: var(--dark-light);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 40px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 12px 40px rgba(0,217,255,0.1);
+            transform: translateY(-4px);
+        }
+
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, rgba(0,217,255,0.15), rgba(0,168,198,0.15));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 24px;
+        }
+
+        .feature-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .feature-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .feature-metric {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 20px;
+            padding: 8px 12px;
+            background: rgba(0,217,255,0.1);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'DM Mono', monospace;
+            color: var(--primary);
+        }
+
+        /* Map Preview Section */
+        .map-section {
+            padding: 120px 60px;
+            background: var(--dark-light);
+            border-top: 1px solid var(--border);
+        }
+
+        .map-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .map-content {
+            animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .map-mockup {
+            background: var(--dark);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 4/3;
+            animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s backwards;
+        }
+
+        .map-mockup-image {
+            position: absolute;
+            inset: 0;
+            background: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=2070&auto=format&fit=crop') center/cover;
+            opacity: 0.6;
+            filter: grayscale(20%) contrast(1.1);
+        }
+
+        .map-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, var(--dark) 0%, transparent 50%);
+        }
+
+        .map-ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+        }
+
+        .map-legend {
+            display: flex;
+            gap: 16px;
+            padding: 12px 16px;
+            background: rgba(10,14,26,0.9);
+            backdrop-filter: blur(12px);
+            border-radius: 8px;
+            font-size: 11px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.danger { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+        .legend-dot.warning { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+        .legend-dot.success { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+        .map-features-list {
+            margin-top: 32px;
+        }
+
+        .map-feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .map-feature-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(0,217,255,0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .map-feature-text h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .map-feature-text p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 140px 60px;
+            text-align: center;
+        }
+
+        .cta-content {
+            max-width: 700px;
+            margin: 0 auto;
+            animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .cta-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: -1px;
+        }
+
+        .cta-description {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 48px;
+            line-height: 1.7;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 60px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .footer-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .footer-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .footer-name span {
+            color: var(--primary);
+        }
+
+        .footer-text {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .footer-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: var(--primary);
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-30px, -30px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(8px); }
+        }
+
+        @keyframes scroll {
+            0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .nav {
+                padding: 16px 24px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .hero {
+                padding: 120px 24px 80px;
+            }
+
+            .stats-section,
+            .features-section,
+            .map-section,
+            .cta-section {
+                padding: 80px 24px;
+            }
+
+            .map-container {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                gap: 24px;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-bg">
+        <div class="ambient-glow glow-1"></div>
+        <div class="ambient-glow glow-2"></div>
+        <div class="ambient-glow glow-3"></div>
+        <div class="grid-pattern"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-brand">
+            <div class="nav-logo">⌁</div>
+            <div class="nav-name">JAN<span>RAKSHAK</span></div>
+        </div>
+        <div class="nav-links">
+            <a href="#features" class="nav-link">Features</a>
+            <a href="#technology" class="nav-link">Technology</a>
+            <a href="#about" class="nav-link">About</a>
+        </div>
+        <div class="nav-cta">
+            <a href="/login" class="btn">Sign In</a>
+            <a href="/dashboard" class="btn btn-primary">Get Access</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="hero-badge-dot"></span>
+                NH-07 Uttarakhand Corridor
+            </div>
+            <h1 class="hero-title">
+                See the slope<span>.</span>
+                Before it moves.
+            </h1>
+            <p class="hero-description">
+                AI-driven geohazard monitoring for the Himalayan highway corridor.
+                Real-time rainfall data, terrain analysis, and physics-grounded
+                stability predictions that save lives.
+            </p>
+            <div class="hero-actions">
+                <a href="/dashboard" class="btn btn-primary btn-large">
+                    Access Command Center
+                    <span>→</span>
+                </a>
+                <a href="#features" class="btn btn-large">Learn More</a>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <span>Scroll to explore</span>
+            <div class="scroll-indicator-icon"></div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">12</div>
+                <div class="stat-label">Monitored Sectors</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">30m</div>
+                <div class="stat-label">DEM Resolution</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">94%</div>
+                <div class="stat-label">Model Accuracy</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">24/7</div>
+                <div class="stat-label">Alert Coverage</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section" id="features">
+        <div class="section-header">
+            <div class="section-eyebrow">Platform Capabilities</div>
+            <h2 class="section-title">Intelligence that protects</h2>
+            <p class="section-subtitle">
+                Integrated geospatial analytics for comprehensive landslide risk assessment
+            </p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">◈</div>
+                <h3 class="feature-title">Real-Time Monitoring</h3>
+                <p class="feature-description">
+                    Live telemetry feeds from Open-Meteo and IMD radar, continuously updated
+                    to capture changing conditions across the NH-07 corridor.
+                </p>
+                <div class="feature-metric">
+                    <span>●</span>
+                    Sub-hourly updates
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⌁</div>
+                <h3 class="feature-title">3D Terrain Analysis</h3>
+                <p class="feature-description">
+                    Interactive WebGL visualization of SRTM digital elevation models with
+                    precise slope geometry and cross-sectional analysis.
+                </p>
+                <div class="feature-metric">
+                    <span>●</span>
+                    30m resolution DEM
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">◒</div>
+                <h3 class="feature-title">Physics-Based Predictions</h3>
+                <p class="feature-description">
+                    Infinite-slope stability model coupled with Green-Ampt infiltration
+                    equations for accurate Factor of Safety calculations.
+                </p>
+                <div class="feature-metric">
+                    <span>●</span>
+                    FoS computation
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">≋</div>
+                <h3 class="feature-title">Historical Validation</h3>
+                <p class="feature-description">
+                    Retrospective testing against known landslide events ensures model
+                    reliability with AUC ROC scores above 0.94.
+                </p>
+                <div class="feature-metric">
+                    <span>●</span>
+                    94% AUC ROC
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Instant Alerts</h3>
+                <p class="feature-description">
+                    Automated warning system triggers when stability thresholds are breached,
+                    with customizable sensitivity controls.
+                </p>
+                <div class="feature-metric">
+                    <span>●</span>
+                    Real-time notifications
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📄</div>
+                <h3 class="feature-title">Exportable Reports</h3>
+                <p class="feature-description">
+                    Generate USDMA-compliant emergency advisory bulletins with one click,
+                    ready for immediate distribution.
+                </p>
+                <div class="feature-metric">
+                    <span>●</span>
+                    PDF export ready
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Map Section -->
+    <section class="map-section" id="technology">
+        <div class="map-container">
+            <div class="map-content">
+                <div class="section-eyebrow">Corridor Overview</div>
+                <h2 class="section-title">The NH-07 Advantage</h2>
+                <p class="section-subtitle" style="margin-bottom: 32px;">
+                    From Rishikesh to Badrinath, JANRAKSHAK monitors 200+ kilometers
+                    of the most geologically active terrain in India.
+                </p>
+                <div class="map-features-list">
+                    <div class="map-feature">
+                        <div class="map-feature-icon">●</div>
+                        <div class="map-feature-text">
+                            <h4>Critical Sector Detection</h4>
+                            <p>Automatic identification of unstable segments requiring immediate attention</p>
+                        </div>
+                    </div>
+                    <div class="map-feature">
+                        <div class="map-feature-icon">↗</div>
+                        <div class="map-feature-text">
+                            <h4>Rainfall Correlation</h4>
+                            <p>Real-time pore pressure modeling based on precipitation data</p>
+                        </div>
+                    </div>
+                    <div class="map-feature">
+                        <div class="map-feature-icon">≋</div>
+                        <div class="map-feature-text">
+                            <h4>Slope Geometry Analysis</h4>
+                            <p>Precise angle and aspect calculations for each monitored sector</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="map-mockup">
+                <div class="map-mockup-image"></div>
+                <div class="map-overlay"></div>
+                <div class="map-ui">
+                    <div class="map-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot danger"></span>
+                            <span>Unstable</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot warning"></span>
+                            <span>Marginal</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot success"></span>
+                            <span>Stable</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section" id="about">
+        <div class="cta-content">
+            <h2 class="cta-title">Ready to protect what matters?</h2>
+            <p class="cta-description">
+                Join USDMA Uttarakhand and partner agencies in using
+                JANRAKSHAK to safeguard the Himalayan corridor.
+            </p>
+            <div class="hero-actions">
+                <a href="/dashboard" class="btn btn-primary btn-large">
+                    Access Dashboard
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="footer-logo">⌁</div>
+                <div class="footer-name">JAN<span>RAKSHAK</span></div>
+            </div>
+            <div class="footer-text">
+                Geospatial Intelligence Platform · NH-07 Uttarakhand Corridor
+            </div>
+            <div class="footer-links">
+                <a href="#" class="footer-link">Documentation</a>
+                <a href="#" class="footer-link">API Reference</a>
+                <a href="#" class="footer-link">Contact</a>
+                <a href="#" class="footer-link">Privacy</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

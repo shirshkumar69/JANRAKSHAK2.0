@@ -251,8 +251,9 @@
             <p class="sub-copy">Real-time SatCom precipitation pulse tracking, storm cell vectoring, and subsurface Green-Ampt pore water pressure coupling for NH-07 Uttarakhand.</p>
 
             <div class="actions-group">
-                <button class="action-btn" id="soundBtn">⚡ Activate Downpour Sound</button>
-                <button class="action-btn secondary" id="controlRoomBtn">Enter Control Room →</button>
+                <button class="action-btn" id="radarConsoleBtn">📡 Open Live Doppler Radar →</button>
+                <button class="action-btn secondary" id="soundBtn">⚡ Downpour Audio</button>
+                <button class="action-btn secondary" id="controlRoomBtn">Command Center ↗</button>
             </div>
 
             <div class="metrics-bar">
@@ -447,9 +448,39 @@
             }
         });
 
-        document.getElementById('controlRoomBtn').addEventListener('click', () => {
-            window.location.href = "/dashboard#view-rainfall";
+        document.getElementById('radarConsoleBtn').addEventListener('click', () => {
+            window.location.href = "/rainfall";
         });
+
+        document.getElementById('controlRoomBtn').addEventListener('click', () => {
+            window.location.href = "/dashboard";
+        });
+
+        // Live Telemetry Sync
+        async function loadLiveTelemetry() {
+            try {
+                const res = await fetch('/api/weather/global?city=Devprayag');
+                if (res.ok) {
+                    const data = await res.json();
+                    const rain = Number(data.rain_rate_mm_h ?? 0.0);
+                    const wind = Number(data.wind_speed_kmh ?? 12.0);
+                    const accum = Number(data.rainfall_24h_mm ?? data.accum_24h_mm ?? 0.0);
+                    const poreRatio = Math.min(1.0, 0.15 + (accum / 150.0));
+
+                    const rainEl = document.getElementById('m-rain');
+                    if (rainEl) rainEl.textContent = `${rain.toFixed(1)} mm/h`;
+
+                    const poreEl = document.getElementById('m-pore');
+                    if (poreEl) poreEl.textContent = `${poreRatio.toFixed(2)} ratio`;
+
+                    const windEl = document.getElementById('m-wind');
+                    if (windEl) windEl.textContent = `${wind.toFixed(0)} km/h`;
+                }
+            } catch (e) {
+                console.log("Telemetry sync fallback active");
+            }
+        }
+        loadLiveTelemetry();
     </script>
 </body>
 </html>

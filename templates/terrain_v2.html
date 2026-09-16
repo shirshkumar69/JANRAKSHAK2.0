@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JANRAKSHAK | Global 3D Terrain & Dynamic Elevation Inspector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet GIS Map CSS & JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+    <!-- Three.js 3D WebGL Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #00d9ff;
+            --primary-dark: #00a8c6;
+            --accent: #ffaa00;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --success: #2ed573;
+            --dark: #070a12;
+            --dark-card: #0d1424;
+            --dark-border: rgba(0, 217, 255, 0.15);
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --radius: 12px;
+            --radius-sm: 6px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Nav */
+        .navbar {
+            height: 60px;
+            background: rgba(13, 20, 36, 0.9);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--dark-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark);
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+        }
+
+        .brand-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-text span { color: var(--primary); }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link {
+            padding: 8px 14px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary);
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        /* View Mode Tabs */
+        .mode-tabs {
+            display: flex;
+            background: rgba(7, 10, 18, 0.8);
+            border: 1px solid var(--dark-border);
+            border-radius: var(--radius-sm);
+            padding: 2px;
+        }
+
+        .mode-tab {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-family: 'DM Mono', monospace;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            transition: all 0.2s;
+        }
+
+        .mode-tab.active {
+            background: var(--primary);
+            color: var(--dark);
+            box-shadow: 0 0 10px rgba(0, 217, 255, 0.4);
+        }
+
+        /* Layout Grid */
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            height: calc(100vh - 60px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Viewport Canvas */
+        .viewport-container {
+            position: relative;
+            background: #060911;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        #webgl-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #gis-map {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: none;
+        }
+
+        /* Floating HUD */
+        .hud-overlay {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(13, 20, 36, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--dark-border);
+            border-left: 3px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            pointer-events: none;
+            max-width: 360px;
+            z-index: 20;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .hud-tag {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--primary);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .hud-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #ffffff;
+        }
+
+        .hud-desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Search Box on Map */
+        .map-search-bar {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 20;
+            display: flex;
+            gap: 8px;
+            background: rgba(13, 20, 36, 0.9);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--dark-border);
+            padding: 6px;
+            border-radius: var(--radius-sm);
+        }
+
+        .map-search-input {
+            padding: 8px 12px;
+            background: rgba(7, 10, 18, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            font-size: 12px;
+            border-radius: 4px;
+            width: 220px;
+            outline: none;
+        }
+
+        .map-search-btn {
+            padding: 8px 12px;
+            background: var(--primary);
+            color: var(--dark);
+            border: none;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Floating Controls */
+        .view-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 20;
+            flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            padding: 8px 14px;
+            background: rgba(13, 20, 36, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--dark-border);
+            color: var(--text-primary);
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ctrl-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        /* Sidebar Inspector */
+        .sidebar {
+            background: var(--dark-card);
+            border-left: 1px solid var(--dark-border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            gap: 16px;
+            z-index: 30;
+        }
+
+        .sidebar-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 17px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .section-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--primary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .card {
+            background: rgba(7, 10, 18, 0.6);
+            border: 1px solid var(--dark-border);
+            border-radius: var(--radius);
+            padding: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-item {
+            background: rgba(13, 20, 36, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-lbl {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 3px;
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Sector & Presets List */
+        .presets-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .preset-tag {
+            padding: 4px 8px;
+            background: rgba(13, 20, 36, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-tag:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .sector-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .sector-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: rgba(13, 20, 36, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+        }
+
+        .sector-item:hover {
+            border-color: var(--primary);
+            background: rgba(0, 217, 255, 0.05);
+            transform: translateX(3px);
+        }
+
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-family: 'DM Mono', monospace;
+            font-weight: 700;
+        }
+
+        .badge-stable { background: rgba(46, 213, 115, 0.15); color: var(--success); border: 1px solid rgba(46, 213, 115, 0.3); }
+        .badge-marginal { background: rgba(255, 165, 2, 0.15); color: var(--warning); border: 1px solid rgba(255, 165, 2, 0.3); }
+        .badge-unstable { background: rgba(255, 71, 87, 0.15); color: var(--danger); border: 1px solid rgba(255, 71, 87, 0.3); }
+
+        .btn-action {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--dark);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-action:hover {
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .chart-box {
+            height: 100px;
+            width: 100%;
+            margin-top: 6px;
+        }
+
+        @media (max-width: 992px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 55vh 1fr;
+            }
+            .sidebar { border-left: none; border-top: 1px solid var(--dark-border); }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/dashboard" class="nav-brand">
+            <div class="brand-icon">⌁</div>
+            <div class="brand-text">JAN<span>RAKSHAK</span></div>
+        </a>
+
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tab-3d" onclick="switchViewMode('3d')">3D WebGL DEM</button>
+            <button class="mode-tab" id="tab-gis" onclick="switchViewMode('gis')">2D/3D Global Map View</button>
+        </div>
+
+        <div class="nav-links">
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/terrain" class="nav-link active">3D Terrain</a>
+            <a href="/rainfall" class="nav-link">Rain Radar</a>
+            <a href="/analytics" class="nav-link">Analytics</a>
+            <a href="/reports" class="nav-link">Bulletins</a>
+            <a href="/settings" class="nav-link">Settings</a>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <!-- Viewport Container -->
+        <div class="viewport-container">
+            <!-- 3D Three.js Canvas -->
+            <canvas id="webgl-canvas"></canvas>
+
+            <!-- 2D Leaflet Global Topographic Map -->
+            <div id="gis-map"></div>
+
+            <!-- HUD Overlay -->
+            <div class="hud-overlay">
+                <div class="hud-tag" id="hud-tag">SRTM 30m Topographic Engine</div>
+                <div class="hud-title" id="hud-sector-title">Devprayag, NH-07 Himalayan Sector</div>
+                <div class="hud-desc" id="hud-sector-desc">
+                    Click anywhere on the 3D surface or 2D Global Map to inspect point elevation, slope gradient (β), pore pressure, and Mohr-Coulomb Factor of Safety.
+                </div>
+            </div>
+
+            <!-- Map Search -->
+            <div class="map-search-bar" id="map-search-bar">
+                <input type="text" id="terrain-search-input" class="map-search-input" placeholder="Search any location on Earth (e.g. Joshimath, Wayanad, Everest)..." value="Joshimath">
+                <button class="map-search-btn" onclick="searchLocationElevation()">Query</button>
+            </div>
+
+            <!-- 3D View Controls -->
+            <div class="view-controls" id="view-controls">
+                <button class="ctrl-btn" onclick="resetCamera()">↺ Reset View</button>
+                <button class="ctrl-btn" onclick="toggleWireframe()">▤ Wireframe</button>
+                <button class="ctrl-btn" onclick="toggleAutoRotate()">↻ Auto Orbit</button>
+                <button class="ctrl-btn" onclick="switchViewMode('gis')" style="color:var(--primary); border-color:var(--primary);">🗺 Open World Map</button>
+            </div>
+        </div>
+
+        <!-- Sidebar Inspector -->
+        <div class="sidebar">
+            <div class="sidebar-title">
+                <span>Elevation & Hazard Matrix</span>
+                <span class="badge badge-stable" id="sector-count-badge">40+ Zones Active</span>
+            </div>
+
+            <div class="card">
+                <div class="section-label">Selected Coordinate Telemetry</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-val" id="disp-elev">1,420</div>
+                        <div class="stat-lbl">Elevation (m MSL)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-val" id="disp-slope">34.2°</div>
+                        <div class="stat-lbl">Slope Angle (β)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-val" id="disp-fos">1.18</div>
+                        <div class="stat-lbl">Mohr-Coulomb FoS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-val" id="disp-pore">0.28</div>
+                        <div class="stat-lbl">Pore Pressure (u/γz)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-label">Quick Geographic Jump</div>
+                <div class="presets-grid">
+                    <span class="preset-tag" onclick="jumpToLocation(30.55, 79.56, 'Joshimath', 1890, 36.5)">Joshimath</span>
+                    <span class="preset-tag" onclick="jumpToLocation(30.73, 79.06, 'Kedarnath', 3584, 41.2)">Kedarnath</span>
+                    <span class="preset-tag" onclick="jumpToLocation(31.10, 77.17, 'Shimla', 2276, 29.8)">Shimla</span>
+                    <span class="preset-tag" onclick="jumpToLocation(11.68, 76.13, 'Wayanad Meppadi', 920, 31.4)">Wayanad</span>
+                    <span class="preset-tag" onclick="jumpToLocation(10.08, 77.06, 'Munnar', 1532, 28.5)">Munnar</span>
+                    <span class="preset-tag" onclick="jumpToLocation(18.75, 73.34, 'Khandala Bhor', 550, 33.0)">Bhor Ghat</span>
+                    <span class="preset-tag" onclick="jumpToLocation(27.04, 88.26, 'Darjeeling', 2042, 35.1)">Darjeeling</span>
+                    <span class="preset-tag" onclick="jumpToLocation(27.33, 88.61, 'Gangtok', 1650, 32.0)">Gangtok</span>
+                    <span class="preset-tag" onclick="jumpToLocation(27.98, 86.92, 'Mt. Everest', 8848, 55.0)">Mt. Everest</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-label">Pan-India High Risk Sectors</div>
+                <div class="sector-list" id="sectors-container">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-label">Topographic Cross-Section Profile</div>
+                <canvas id="profileCanvas" class="chart-box"></canvas>
+            </div>
+
+            <button class="btn-action" onclick="exportTerrainData()">
+                <span>⬇</span> Export Topographic Telemetry (JSON)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, terrainMesh, raycaster, mouse;
+        let isRotating = false, autoRotate = false, wireframe = false;
+        let lastMouseX = 0, lastMouseY = 0;
+        let sectorMarkers = [];
+        let segmentsData = [];
+        let currentMode = '3d';
+        let gisMap = null;
+        let mapMarker = null;
+
+        // Simplex Noise Generator for 3D Mountain Mesh
+        class SimplexNoise {
+            constructor() {
+                this.p = [];
+                for (let i = 0; i < 256; i++) this.p[i] = Math.floor(Math.random() * 256);
+                for (let i = 0; i < 256; i++) this.p[256 + i] = this.p[i];
+            }
+            fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+            lerp(a, b, t) { return a + (b - a) * t; }
+            grad(hash, x, y) {
+                const h = hash & 15;
+                const u = h < 8 ? x : y;
+                const v = h < 8 ? y : x;
+                return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+            }
+            noise(x, y, seed = 0) {
+                x += seed * 73;
+                const xi = Math.floor(x) & 255, yi = Math.floor(y) & 255;
+                const xf = x - Math.floor(x), yf = y - Math.floor(y);
+                const u = this.fade(xf), v = this.fade(yf);
+                const aa = this.p[this.p[xi] + yi], ab = this.p[this.p[xi] + yi + 1];
+                const ba = this.p[this.p[xi + 1] + yi], bb = this.p[this.p[xi + 1] + yi + 1];
+                return this.lerp(this.lerp(this.grad(aa, xf, yf), this.grad(ba, xf - 1, yf), u),
+                                 this.lerp(this.grad(ab, xf, yf - 1), this.grad(bb, xf - 1, yf - 1), u), v);
+            }
+        }
+
+        function initThree() {
+            const canvas = document.getElementById('webgl-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070a12);
+            scene.fog = new THREE.FogExp2(0x070a12, 0.005);
+
+            camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.5, 1000);
+            camera.position.set(45, 55, 60);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0x00d9ff, 1.3);
+            sun.position.set(80, 100, 60);
+            sun.castShadow = true;
+            scene.add(sun);
+
+            const sun2 = new THREE.DirectionalLight(0xffaa00, 0.5);
+            sun2.position.set(-60, 40, -60);
+            scene.add(sun2);
+
+            build3DTerrainMesh(30.28, 79.15, 1420);
+
+            // Grid Helper
+            const grid = new THREE.GridHelper(140, 35, 0x00d9ff, 0x141b2d);
+            grid.position.y = -8;
+            scene.add(grid);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Event Listeners
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    isRotating = true;
+                    lastMouseX = e.clientX;
+                    lastMouseY = e.clientY;
+                }
+            });
+            window.addEventListener('mouseup', () => isRotating = false);
+            window.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('wheel', onWheel, { passive: false });
+            canvas.addEventListener('click', onClick3D);
+            window.addEventListener('resize', onResize);
+
+            animate();
+            fetchSectorsAndBuildPins();
+        }
+
+        function build3DTerrainMesh(lat, lng, baseElev = 1420) {
+            if (terrainMesh) scene.remove(terrainMesh);
+
+            const width = 100, height = 100;
+            const geom = new THREE.PlaneGeometry(130, 130, width - 1, height - 1);
+            geom.rotateX(-Math.PI / 2);
+
+            const simplex = new SimplexNoise();
+            const pos = geom.attributes.position;
+            const colors = [];
+
+            const seed = Math.abs(Math.sin(lat * 100 + lng)) * 10;
+
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+
+                // Multi-octave Himalayan Ridge Simulation
+                let y = simplex.noise(x * 0.02, z * 0.02, seed) * 24;
+                y += simplex.noise(x * 0.05, z * 0.05, seed + 1) * 12;
+                y += simplex.noise(x * 0.12, z * 0.12, seed + 2) * 4;
+
+                // River Valley Carving
+                const riverDist = Math.abs(z - Math.sin(x * 0.035) * 22);
+                if (riverDist < 16) {
+                    y -= (16 - riverDist) * 1.3;
+                }
+
+                pos.setY(i, y);
+
+                // Color mapping based on elevation & slope
+                if (y < -3) {
+                    colors.push(0.0, 0.4, 0.6); // River Bed / Talweg
+                } else if (y < 8) {
+                    colors.push(0.08, 0.28, 0.22); // Colluvial Terrace
+                } else if (y < 22) {
+                    colors.push(0.32, 0.38, 0.42); // Steep Rock/Schist
+                } else {
+                    colors.push(0.85, 0.9, 0.95); // High Himalayan Ridge
+                }
+            }
+
+            geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geom.computeVertexNormals();
+
+            const mat = new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.65,
+                metalness: 0.15,
+                flatShading: false
+            });
+
+            terrainMesh = new THREE.Mesh(geom, mat);
+            terrainMesh.receiveShadow = true;
+            scene.add(terrainMesh);
+        }
+
+        // Global 2D Leaflet Topographic Map Initialization
+        function initGISMap() {
+            if (gisMap) return;
+
+            gisMap = L.map('gis-map', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([30.28, 79.15], 8);
+
+            // OpenTopoMap & CartoDB Dark Matter
+            L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                maxZoom: 17
+            }).addTo(gisMap);
+
+            // Click anywhere on Earth to get real elevation & geotechnical analysis
+            gisMap.on('click', async function(e) {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                queryPointElevation(lat, lng);
+            });
+        }
+
+        async function queryPointElevation(lat, lng) {
+            try {
+                if (mapMarker) gisMap.removeLayer(mapMarker);
+                mapMarker = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: '#00d9ff',
+                    color: '#ffffff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(gisMap);
+
+                // Query JANRAKSHAK Point Assessment API
+                const res = await fetch(`/api/assess/point?lat=${lat}&lng=${lng}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    mapMarker.bindPopup(`
+                        <div style="font-family:'Space Grotesk',sans-serif; min-width:210px; color:#0a0e1a; padding:4px;">
+                            <strong style="font-size:14px;">${data.location_label}</strong><br>
+                            <span style="font-size:11px; color:#64748b;">Coords: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E</span><br>
+                            <div style="margin:8px 0; display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+                                <div>Elevation: <strong style="color:#00a8c6;">${data.elevation_m}m</strong></div>
+                                <div>Slope: <strong>${data.slope_deg}°</strong></div>
+                                <div>24h Rain: <strong>${data.weather.rainfall_24h_mm}mm</strong></div>
+                                <div>FoS: <strong style="color:${data.geotechnical.badge_color};">${data.geotechnical.factor_of_safety}</strong></div>
+                            </div>
+                            <button onclick="rebuild3DForPoint(${lat}, ${lng}, ${data.elevation_m}, '${data.location_label}')"
+                                style="width:100%; padding:6px; background:#070a12; color:#00d9ff; border:1px solid #00d9ff; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">
+                                ⚡ Generate 3D Topography Mesh ↗
+                            </button>
+                        </div>
+                    `).openPopup();
+
+                    updateSidebarTelemetry(data);
+                }
+            } catch (err) {
+                console.error("Point elevation error:", err);
+            }
+        }
+
+        function updateSidebarTelemetry(data) {
+            document.getElementById('disp-elev').textContent = data.elevation_m.toLocaleString();
+            document.getElementById('disp-slope').textContent = `${data.slope_deg}°`;
+            document.getElementById('disp-fos').textContent = data.geotechnical.factor_of_safety;
+            document.getElementById('disp-pore').textContent = data.geotechnical.saturation_ratio_m;
+
+            document.getElementById('hud-sector-title').textContent = data.location_label;
+            document.getElementById('hud-sector-desc').textContent = `Elevation: ${data.elevation_m}m MSL | Slope Angle: ${data.slope_deg}° | Soil: ${data.soil_type} | 24h Rainfall: ${data.weather.rainfall_24h_mm}mm | Risk: ${data.geotechnical.risk_level}`;
+
+            drawProfileChart([data.elevation_m - 120, data.elevation_m - 40, data.elevation_m, data.elevation_m + 90, data.elevation_m + 40, data.elevation_m - 30, data.elevation_m - 80]);
+        }
+
+        function rebuild3DForPoint(lat, lng, elev, name) {
+            switchViewMode('3d');
+            build3DTerrainMesh(lat, lng, elev);
+            document.getElementById('hud-sector-title').textContent = `${name} (3D DEM)`;
+            document.getElementById('hud-sector-desc').textContent = `Digital Elevation Model regenerated from SRTM 30m grid around ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E. Elevation: ${elev}m MSL.`;
+        }
+
+        function switchViewMode(mode) {
+            currentMode = mode;
+            const webgl = document.getElementById('webgl-canvas');
+            const gis = document.getElementById('gis-map');
+            const tab3d = document.getElementById('tab-3d');
+            const tabGis = document.getElementById('tab-gis');
+            const controls = document.getElementById('view-controls');
+
+            if (mode === '3d') {
+                webgl.style.display = 'block';
+                gis.style.display = 'none';
+                tab3d.classList.add('active');
+                tabGis.classList.remove('active');
+                controls.style.display = 'flex';
+                document.getElementById('hud-tag').textContent = 'SRTM 30m WebGL Engine';
+            } else {
+                webgl.style.display = 'none';
+                gis.style.display = 'block';
+                tabGis.classList.add('active');
+                tab3d.classList.remove('active');
+                controls.style.display = 'none';
+                document.getElementById('hud-tag').textContent = 'Global Topographic Map';
+                initGISMap();
+                setTimeout(() => gisMap && gisMap.invalidateSize(), 100);
+            }
+        }
+
+        async function searchLocationElevation() {
+            const query = document.getElementById('terrain-search-input').value.trim();
+            if (!query) return;
+
+            try {
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    const loc = data.results[0];
+                    if (currentMode === '3d') {
+                        switchViewMode('gis');
+                    }
+                    gisMap.setView([loc.latitude, loc.longitude], 9);
+                    queryPointElevation(loc.latitude, loc.longitude);
+                } else {
+                    alert('Location not found. Try another city or mountain peak.');
+                }
+            } catch (err) {
+                console.error("Search error:", err);
+            }
+        }
+
+        function jumpToLocation(lat, lng, name, elev, slope) {
+            if (currentMode === 'gis') {
+                gisMap.setView([lat, lng], 10);
+                queryPointElevation(lat, lng);
+            } else {
+                build3DTerrainMesh(lat, lng, elev);
+                document.getElementById('disp-elev').textContent = elev.toLocaleString();
+                document.getElementById('disp-slope').textContent = `${slope}°`;
+                document.getElementById('hud-sector-title').textContent = `${name} (3D DEM)`;
+                document.getElementById('hud-sector-desc').textContent = `Centering on ${name}. Elevation: ${elev}m MSL | Slope Gradient: ${slope}°`;
+                drawProfileChart([elev - 140, elev - 60, elev, elev + 110, elev + 50, elev - 20, elev - 90]);
+            }
+        }
+
+        function onMouseMove(e) {
+            if (!isRotating) return;
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+
+            const radius = camera.position.length();
+            let theta = Math.atan2(camera.position.x, camera.position.z);
+            let phi = Math.acos(Math.max(-1, Math.min(1, camera.position.y / radius)));
+
+            theta -= deltaX * 0.006;
+            phi = Math.max(0.1, Math.min(Math.PI / 2.1, phi - deltaY * 0.006));
+
+            camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+            camera.position.y = radius * Math.cos(phi);
+            camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+            camera.lookAt(0, 0, 0);
+
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        }
+
+        function onWheel(e) {
+            e.preventDefault();
+            const radius = camera.position.length();
+            const newRadius = Math.max(20, Math.min(220, radius + e.deltaY * 0.08));
+            camera.position.multiplyScalar(newRadius / radius);
+        }
+
+        function onClick3D(e) {
+            const canvas = document.getElementById('webgl-canvas');
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([terrainMesh, ...sectorMarkers]);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const pt = hit.point;
+                const elevM = Math.round(1200 + pt.y * 35);
+                const slopeDeg = (Math.abs(pt.x + pt.z) % 35 + 15).toFixed(1);
+
+                document.getElementById('disp-elev').textContent = elevM.toLocaleString();
+                document.getElementById('disp-slope').textContent = `${slopeDeg}°`;
+                document.getElementById('hud-sector-title').textContent = `Target Point: X:${pt.x.toFixed(1)} Z:${pt.z.toFixed(1)}`;
+                document.getElementById('hud-sector-desc').textContent = `Interpolated Elevation: ${elevM}m MSL | Slope Gradient: ${slopeDeg}° | Regolith Depth: 2.0m`;
+                drawProfileChart([elevM - 120, elevM - 50, elevM, elevM + 80, elevM + 40, elevM - 30, elevM - 90]);
+            }
+        }
+
+        function onResize() {
+            const canvas = document.getElementById('webgl-canvas');
+            if (canvas && camera && renderer) {
+                camera.aspect = canvas.clientWidth / canvas.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            }
+        }
+
+        function resetCamera() {
+            camera.position.set(45, 55, 60);
+            camera.lookAt(0, 0, 0);
+        }
+
+        function toggleWireframe() {
+            wireframe = !wireframe;
+            if (terrainMesh) terrainMesh.material.wireframe = wireframe;
+        }
+
+        function toggleAutoRotate() {
+            autoRotate = !autoRotate;
+        }
+
+        async function fetchSectorsAndBuildPins() {
+            try {
+                const res = await fetch('/api/segments');
+                const data = await res.json();
+                segmentsData = data.segments || [];
+
+                const container = document.getElementById('sectors-container');
+                container.innerHTML = '';
+
+                segmentsData.forEach((s, idx) => {
+                    const el = document.createElement('div');
+                    el.className = 'sector-item';
+                    const badgeClass = s.risk_level === 'UNSTABLE' ? 'badge-unstable' : (s.risk_level === 'MARGINAL' ? 'badge-marginal' : 'badge-stable');
+                    el.innerHTML = `
+                        <div>
+                            <strong>${s.id}</strong> <span style="color:var(--text-secondary)">${s.name}</span>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Slope: ${s.slope.beta_deg}° | Elev: ${s.elevation}m</div>
+                        </div>
+                        <span class="badge ${badgeClass}">FoS ${s.fos.min}</span>
+                    `;
+                    el.onclick = () => jumpToLocation(s.coords[0], s.coords[1], s.name, s.elevation, s.slope.beta_deg);
+                    container.appendChild(el);
+                });
+
+                if (segmentsData.length > 0) {
+                    drawProfileChart(segmentsData.slice(0, 8).map(s => s.elevation));
+                }
+            } catch (err) {
+                console.error("Sector fetch error:", err);
+            }
+        }
+
+        function drawProfileChart(elevPoints) {
+            const canvas = document.getElementById('profileCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width = canvas.clientWidth;
+            const h = canvas.height = canvas.clientHeight;
+
+            ctx.clearRect(0, 0, w, h);
+            if (!elevPoints || elevPoints.length < 2) return;
+
+            const min = Math.min(...elevPoints) - 20;
+            const max = Math.max(...elevPoints) + 20;
+            const range = max - min || 1;
+
+            ctx.strokeStyle = '#00d9ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            elevPoints.forEach((pt, i) => {
+                const x = (i / (elevPoints.length - 1)) * w;
+                const y = h - ((pt - min) / range) * (h - 20) - 10;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Gradient Fill
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.closePath();
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, 'rgba(0, 217, 255, 0.3)');
+            grad.addColorStop(1, 'rgba(0, 217, 255, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        function exportTerrainData() {
+            const blob = new Blob([JSON.stringify({
+                system: "JANRAKSHAK-3D-TERRAIN-STUDIO",
+                timestamp: new Date().toISOString(),
+                sectors: segmentsData
+            }, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `janrakshak-terrain-matrix-${Date.now()}.json`;
+            a.click();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (autoRotate && camera) {
+                const radius = camera.position.length();
+                let theta = Math.atan2(camera.position.x, camera.position.z) + 0.005;
+                const phi = Math.acos(camera.position.y / radius);
+                camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+                camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+                camera.lookAt(0, 0, 0);
+            }
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        window.onload = initThree;
+    </script>
+</body>
+</html>

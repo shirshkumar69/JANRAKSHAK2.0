@@ -24,44 +24,125 @@ const segmentCoords = {
 // ----------------------------------------------------
 // MAP INITIALIZATION (Leaflet + Esri Satellite)
 // ----------------------------------------------------
-const map = L.map('real-map', {
-    zoomControl: false,
-    attributionControl: false
-}).setView([30.35, 78.9], 9);
+let map = null;
+let satelliteLayer = null;
+let topoLayer = null;
+let standardOSMLayer = null;
+let movableMarker = null;
 
-// Add custom zoom control to bottom right
-L.control.zoom({ position: 'bottomright' }).addTo(map);
+if (typeof L !== 'undefined' && document.getElementById('real-map')) {
+    map = L.map('real-map', {
+        zoomControl: false,
+        attributionControl: false
+    }).setView([30.35, 78.9], 9);
 
-// Define Base Layers
-const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 17
-});
+    // Add custom zoom control to bottom right
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17
-});
+    // Define Base Layers
+    satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 17
+    });
 
-// We will use OpenStreetMap tiles inverted via CSS for the dark layer to avoid any API key issues
-const standardOSMLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17
-});
+    topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17
+    });
 
-// Set default layer
-satelliteLayer.addTo(map);
+    // We will use OpenStreetMap tiles inverted via CSS for the dark layer to avoid any API key issues
+    standardOSMLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17
+    });
+
+    // Set default layer
+    satelliteLayer.addTo(map);
+
+    // Create custom green dot icon (larger hit area for draggability)
+    const greenDotIcon = L.divIcon({
+        className: 'custom-drag-icon',
+        html: '<div class="pulse-probe"></div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+    });
+
+    // Place it on the map and make it draggable
+    movableMarker = L.marker([30.35, 78.9], {
+        icon: greenDotIcon,
+        draggable: true,
+        autoPan: true
+    }).addTo(map);
+
+    movableMarker.on('dragend', async function(event) {
+        const coords = movableMarker.getLatLng();
+        const lat = coords.lat.toFixed(4);
+        const lng = coords.lng.toFixed(4);
+
+        // Show a loading state in the popup
+        const popupStyle = `background:#0a0e1c; color:#f0f4f8; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); width: 180px;`;
+
+        movableMarker.bindPopup(`
+            <div style="${popupStyle}">
+                <i>Extracting telemetry for <b>${lat}, ${lng}</b>...</i>
+            </div>
+        `, { className: 'dark-popup' }).openPopup();
+
+        try {
+            // Fetch new weather data directly (using open-meteo)
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,temperature_2m,wind_speed_10m&timezone=auto`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            const rain = Number(data.current.precipitation || 0).toFixed(1);
+            const temp = Number(data.current.temperature_2m || 0).toFixed(1);
+
+            // Update popup with live intelligence
+            movableMarker.getPopup().setContent(`
+                <div style="${popupStyle}">
+                    <h4 style="margin:0 0 5px; color:#00f2fe">GEOSPATIAL PROBE</h4>
+                    <div style="font-size:11px; margin-bottom:5px;">LAT: ${lat} | LON: ${lng}</div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="color:#8899ac">Rainfall:</span>
+                        <strong>${rain} mm</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="color:#8899ac">Temp:</span>
+                        <strong>${temp} °C</strong>
+                    </div>
+                    <div style="font-size:9px; color:#536275; margin-top:8px;">*Requires backend sync for FoS</div>
+                </div>
+            `);
+        } catch (err) {
+            movableMarker.getPopup().setContent(`
+                <div style="${popupStyle}">
+                    <span style='color:#ff4757;'>Telemetry link failed.</span>
+                </div>
+            `);
+        }
+    });
+}
 
 // Map Controls Logic
-document.getElementById('btn-sat').onclick = (e) => setMapLayer(e, satelliteLayer, false);
-document.getElementById('btn-topo').onclick = (e) => setMapLayer(e, topoLayer, false);
-document.getElementById('btn-dark').onclick = (e) => setMapLayer(e, standardOSMLayer, true);
+const btnSat = document.getElementById('btn-sat');
+if (btnSat) btnSat.onclick = (e) => setMapLayer(e, satelliteLayer, false);
+const btnTopo = document.getElementById('btn-topo');
+if (btnTopo) btnTopo.onclick = (e) => setMapLayer(e, topoLayer, false);
+const btnDark = document.getElementById('btn-dark');
+if (btnDark) btnDark.onclick = (e) => setMapLayer(e, standardOSMLayer, true);
 
 function setMapLayer(btnEvent, layer, isDark) {
+    if (!map || !layer) return;
     document.querySelectorAll('.map-btn').forEach(b => b.classList.remove('selected'));
-    btnEvent.target.classList.add('selected');
+    if (btnEvent && btnEvent.target) {
+        btnEvent.target.classList.add('selected');
+    }
 
-    if (isDark) {
-        document.getElementById('real-map').classList.add('tactical-dark');
-    } else {
-        document.getElementById('real-map').classList.remove('tactical-dark');
+    const realMapEl = document.getElementById('real-map');
+    if (realMapEl) {
+        if (isDark) {
+            realMapEl.classList.add('tactical-dark');
+        } else {
+            realMapEl.classList.remove('tactical-dark');
+        }
     }
 
     map.eachLayer((l) => map.removeLayer(l));
@@ -74,70 +155,6 @@ function setMapLayer(btnEvent, layer, isDark) {
 
 let mapMarkers = [];
 
-// Create custom green dot icon (larger hit area for draggability)
-const greenDotIcon = L.divIcon({
-    className: 'custom-drag-icon',
-    html: '<div class="pulse-probe"></div>',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-});
-
-// Place it on the map and make it draggable
-let movableMarker = L.marker([30.35, 78.9], {
-    icon: greenDotIcon,
-    draggable: true,
-    autoPan: true
-}).addTo(map);
-
-movableMarker.on('dragend', async function(event) {
-    const coords = movableMarker.getLatLng();
-    const lat = coords.lat.toFixed(4);
-    const lng = coords.lng.toFixed(4);
-
-    // Show a loading state in the popup
-    const popupStyle = `background:#0a0e1c; color:#f0f4f8; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); width: 180px;`;
-
-    movableMarker.bindPopup(`
-        <div style="${popupStyle}">
-            <i>Extracting telemetry for <b>${lat}, ${lng}</b>...</i>
-        </div>
-    `, { className: 'dark-popup' }).openPopup();
-
-    try {
-        // Fetch new weather data directly (using open-meteo)
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,temperature_2m,wind_speed_10m&timezone=auto`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        const rain = Number(data.current.precipitation || 0).toFixed(1);
-        const temp = Number(data.current.temperature_2m || 0).toFixed(1);
-
-        // Update popup with live intelligence
-        movableMarker.getPopup().setContent(`
-            <div style="${popupStyle}">
-                <h4 style="margin:0 0 5px; color:#00f2fe">GEOSPATIAL PROBE</h4>
-                <div style="font-size:11px; margin-bottom:5px;">LAT: ${lat} | LON: ${lng}</div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <span style="color:#8899ac">Rainfall:</span>
-                    <strong>${rain} mm</strong>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <span style="color:#8899ac">Temp:</span>
-                    <strong>${temp} °C</strong>
-                </div>
-                <div style="font-size:9px; color:#536275; margin-top:8px;">*Requires backend sync for FoS</div>
-            </div>
-        `);
-    } catch (err) {
-        movableMarker.getPopup().setContent(`
-            <div style="${popupStyle}">
-                <span style='color:#ff4757;'>Telemetry link failed.</span>
-            </div>
-        `);
-    }
-});
-
 // Fetch live data from backend
 async function fetchSegments() {
     try {
@@ -148,8 +165,8 @@ async function fetchSegments() {
 
             // Sync thresholds from initial load
             if (data.thresholds) {
-                u.value = data.thresholds.unstable;
-                m.value = data.thresholds.marginal;
+                if (u) u.value = data.thresholds.unstable;
+                if (m) m.value = data.thresholds.marginal;
                 sync();
             }
 
@@ -160,12 +177,16 @@ async function fetchSegments() {
         }
     } catch (e) {
         console.error("Failed to load segments:", e);
-        rows.innerHTML = '<div style="padding:20px;color:#ff4757">Failed to connect to telemetry datalink. Retrying...</div>';
+        if (rows) {
+            rows.innerHTML = '<div style="padding:20px;color:#ff4757">Failed to connect to telemetry datalink. Retrying...</div>';
+        }
     }
 }
 
 // Render Map Markers dynamically based on risk level
 function renderMarkers() {
+    if (!map || typeof L === 'undefined') return;
+
     // Clear old markers
     mapMarkers.forEach(m => map.removeLayer(m));
     mapMarkers = [];
@@ -236,7 +257,7 @@ document.head.appendChild(style);
 
 // Render rows exactly matching 3d aesthetics
 function render() {
-    if (!allSegments.length) return;
+    if (!rows || !allSegments.length) return;
 
     rows.innerHTML = allSegments.map((seg, idx) => {
         let cls = seg.risk_level.toLowerCase();
@@ -277,24 +298,31 @@ function updateStats() {
 
             // Play Alarm Custom Synthesis
             if (!window.alarmInterval) {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    try {
+                        const audioCtx = new AudioContextClass();
 
-                window.alarmInterval = setInterval(() => {
-                    if (audioCtx.state === 'suspended') audioCtx.resume();
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-                    osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.3);
+                        window.alarmInterval = setInterval(() => {
+                            if (audioCtx.state === 'suspended') audioCtx.resume();
+                            const osc = audioCtx.createOscillator();
+                            const gain = audioCtx.createGain();
+                            osc.type = 'square';
+                            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                            osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.3);
 
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
 
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.5);
-                }, 1000);
+                            osc.connect(gain);
+                            gain.connect(audioCtx.destination);
+                            osc.start();
+                            osc.stop(audioCtx.currentTime + 0.5);
+                        }, 1000);
+                    } catch (err) {
+                        console.warn('Alarm AudioContext failed:', err);
+                    }
+                }
             }
         } else if (unstableCount === 0) {
             banner.classList.remove('show');
@@ -305,7 +333,6 @@ function updateStats() {
         }
     }
 
-
     // Update the critical segments counter
     const alertCard = document.querySelector('#unstableCount');
     if (alertCard) {
@@ -313,7 +340,7 @@ function updateStats() {
     }
 
     // Total 24h rainfall over all segments
-    const maxRainfall = Math.max(...allSegments.map(s => s.rainfall.accum_24h_mm || 0));
+    const maxRainfall = allSegments.length ? Math.max(...allSegments.map(s => s.rainfall.accum_24h_mm || 0)) : 0;
     const rainCard = document.querySelector('#maxRain');
     if (rainCard) {
         rainCard.innerHTML = `${maxRainfall.toFixed(1)} <small>mm</small>`;
@@ -329,12 +356,12 @@ function updateStats() {
 
 // Sync slider visually
 function sync() {
-    uOut.value = (+u.value).toFixed(2);
-    mOut.value = (+m.value).toFixed(2);
+    if (uOut && u) uOut.value = (+u.value).toFixed(2);
+    if (mOut && m) mOut.value = (+m.value).toFixed(2);
 }
 
 // Event Listeners for sliders
-[u, m].forEach(slider => {
+[u, m].filter(Boolean).forEach(slider => {
     slider.addEventListener('input', (e) => {
         sync();
         // Optimistic UI update (client side logic matching threshold temporarily)
@@ -363,43 +390,47 @@ function sync() {
 });
 
 // Update thresholds on backend
-document.querySelector('#apply').onclick = async () => {
-    const btn = document.querySelector('#apply');
-    const ogText = btn.innerHTML;
-    btn.innerHTML = '<span>Calibrating...</span>';
+const applyBtn = document.querySelector('#apply');
+if (applyBtn) {
+    applyBtn.onclick = async () => {
+        const ogText = applyBtn.innerHTML;
+        applyBtn.innerHTML = '<span>Calibrating...</span>';
 
-    try {
-        await fetch('/api/thresholds', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                unstable: parseFloat(u.value),
-                marginal: parseFloat(m.value)
-            })
-        });
-        await fetchSegments();
-        btn.innerHTML = '<span>Calibrated ✓</span>';
-        setTimeout(() => btn.innerHTML = ogText, 2000);
-    } catch (e) {
-        console.error("Failed to update thresholds", e);
-        btn.innerHTML = '<span>Link Error!</span>';
-        setTimeout(() => btn.innerHTML = ogText, 2000);
-    }
-};
+        try {
+            await fetch('/api/thresholds', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    unstable: parseFloat(u.value),
+                    marginal: parseFloat(m.value)
+                })
+            });
+            await fetchSegments();
+            applyBtn.innerHTML = '<span>Calibrated ✓</span>';
+            setTimeout(() => applyBtn.innerHTML = ogText, 2000);
+        } catch (e) {
+            console.error("Failed to update thresholds", e);
+            applyBtn.innerHTML = '<span>Link Error!</span>';
+            setTimeout(() => applyBtn.innerHTML = ogText, 2000);
+        }
+    };
+}
 
 // Force Refresh Data
-document.querySelector('#refresh').onclick = async () => {
-    const btn = document.querySelector('#refresh');
-    const ogText = btn.innerHTML;
-    btn.innerHTML = '<span class="refresh-icon">...</span><span>Fetching...</span>';
+const refreshBtn = document.querySelector('#refresh');
+if (refreshBtn) {
+    refreshBtn.onclick = async () => {
+        const ogText = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<span class="refresh-icon">...</span><span>Fetching...</span>';
 
-    try {
-        await fetch('/api/refresh', { method: 'POST' });
-        await fetchSegments();
-    } finally {
-        setTimeout(() => { btn.innerHTML = ogText; }, 1000);
-    }
-};
+        try {
+            await fetch('/api/refresh', { method: 'POST' });
+            await fetchSegments();
+        } finally {
+            setTimeout(() => { refreshBtn.innerHTML = ogText; }, 1000);
+        }
+    };
+}
 
 // Start
 sync();
@@ -407,6 +438,226 @@ fetchSegments();
 
 // Auto refresh every 5 min
 setInterval(fetchSegments, 300000);
+
+// ----------------------------------------------------
+// Tactical UI Audio Feedback (Procedural Web Audio API)
+// ----------------------------------------------------
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+const uiAudioCtx = AudioContextClass ? new AudioContextClass() : null;
+
+function playUIBeep(type = 'click') {
+    if (!uiAudioCtx) return;
+    if (uiAudioCtx.state === 'suspended') {
+        uiAudioCtx.resume().catch(() => {});
+    }
+
+    try {
+        const osc = uiAudioCtx.createOscillator();
+        const gain = uiAudioCtx.createGain();
+
+        osc.connect(gain);
+        gain.connect(uiAudioCtx.destination);
+
+        const now = uiAudioCtx.currentTime;
+
+        if (type === 'click') {
+            // High pitched short tech ping
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.05, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+            osc.start(now);
+            osc.stop(now + 0.06);
+        } else if (type === 'hover') {
+            // Very subtle soft click
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(400, now);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.01);
+            gain.gain.linearRampToValueAtTime(0.03, now + 0.03);
+            osc.start(now);
+            osc.stop(now + 0.04);
+        } else if (type === 'confirm') {
+            // Double ping (e.g. calibration)
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1000, now);
+            osc.frequency.setValueAtTime(1400, now + 0.1);
+
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.08, now + 0.02);
+            gain.gain.linearRampToValueAtTime(0.001, now + 0.08);
+
+            gain.gain.setValueAtTime(0, now + 0.1);
+            gain.gain.linearRampToValueAtTime(0.08, now + 0.12);
+            gain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+
+            osc.start(now);
+            osc.stop(now + 0.35);
+        } else if (type === 'error') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
+            gain.gain.linearRampToValueAtTime(0.001, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.25);
+        }
+    } catch (e) {
+        console.warn('playUIBeep failed:', e);
+    }
+}
+
+// ----------------------------------------------------
+// RAIN PARTICLES & AUDIO SYNTHESIS ENGINE
+// ----------------------------------------------------
+let ambientRainFrame = null;
+let splashRainFrame = null;
+let rainAudioNode = null;
+let rainGainNode = null;
+
+function createRainAnimation(canvasId, dropCount, color, setFrameCallback) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const drops = [];
+    for (let i = 0; i < dropCount; i++) {
+        drops.push({
+            x: Math.random() * 2500,
+            y: Math.random() * 1500,
+            len: Math.random() * 24 + 14,
+            speed: Math.random() * 18 + 14,
+            opacity: Math.random() * 0.5 + 0.5
+        });
+    }
+
+    function renderRain() {
+        const cw = canvas.parentElement ? canvas.parentElement.clientWidth : window.innerWidth;
+        const ch = canvas.parentElement ? canvas.parentElement.clientHeight : window.innerHeight;
+
+        if (canvas.width !== cw) canvas.width = cw;
+        if (canvas.height !== ch) canvas.height = ch;
+
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = canvasId === 'splash-rain-canvas' ? 1.8 : 1.0;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+
+        for (let i = 0; i < drops.length; i++) {
+            const d = drops[i];
+            ctx.moveTo(d.x, d.y);
+            ctx.lineTo(d.x - d.len / 3, d.y + d.len);
+            d.y += d.speed;
+            d.x -= d.speed / 3;
+
+            if (d.y > ch || d.x < -50) {
+                d.y = -30;
+                d.x = Math.random() * (cw + 200);
+            }
+        }
+        ctx.stroke();
+
+        const frame = requestAnimationFrame(renderRain);
+        if (setFrameCallback) setFrameCallback(frame);
+    }
+    renderRain();
+}
+
+function startRainSound() {
+    if (!uiAudioCtx) return;
+    if (uiAudioCtx.state === 'suspended') {
+        uiAudioCtx.resume().catch(() => {});
+    }
+    if (rainAudioNode) return;
+
+    try {
+        const bufferSize = uiAudioCtx.sampleRate * 2;
+        const buffer = uiAudioCtx.createBuffer(1, bufferSize, uiAudioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            lastOut = (lastOut * 0.94) + (white * 0.06);
+            data[i] = lastOut * 3.5;
+        }
+
+        rainAudioNode = uiAudioCtx.createBufferSource();
+        rainAudioNode.buffer = buffer;
+        rainAudioNode.loop = true;
+
+        const filter = uiAudioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(650, uiAudioCtx.currentTime);
+
+        rainGainNode = uiAudioCtx.createGain();
+        rainGainNode.gain.setValueAtTime(0.001, uiAudioCtx.currentTime);
+        rainGainNode.gain.linearRampToValueAtTime(0.25, uiAudioCtx.currentTime + 1.2);
+
+        rainAudioNode.connect(filter);
+        filter.connect(rainGainNode);
+        rainGainNode.connect(uiAudioCtx.destination);
+
+        rainAudioNode.start();
+    } catch (err) {
+        console.warn('Rain audio error:', err);
+    }
+}
+
+function stopRainSound() {
+    if (rainGainNode && rainAudioNode && uiAudioCtx) {
+        try {
+            rainGainNode.gain.linearRampToValueAtTime(0.001, uiAudioCtx.currentTime + 0.8);
+            setTimeout(() => {
+                if (rainAudioNode) {
+                    try {
+                        rainAudioNode.stop();
+                        rainAudioNode.disconnect();
+                    } catch (e) {}
+                    rainAudioNode = null;
+                }
+            }, 850);
+        } catch (e) {
+            if (rainAudioNode) {
+                try {
+                    rainAudioNode.disconnect();
+                } catch (err) {}
+                rainAudioNode = null;
+            }
+        }
+    }
+}
+
+function dismissRainLanding() {
+    const landing = document.getElementById('rainfall-landing');
+    if (!landing) return;
+    landing.style.opacity = '0';
+    landing.style.pointerEvents = 'none';
+    setTimeout(() => {
+        landing.style.visibility = 'hidden';
+        landing.style.display = 'none';
+    }, 600);
+    startRainSound();
+    playUIBeep('confirm');
+}
+
+const activateBtn = document.getElementById('activate-telemetry-btn');
+if (activateBtn) {
+    activateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dismissRainLanding();
+    });
+}
+
+const rainLandingOverlay = document.getElementById('rainfall-landing');
+if (rainLandingOverlay) {
+    rainLandingOverlay.addEventListener('click', () => {
+        dismissRainLanding();
+    });
+}
 
 // ----------------------------------------------------
 // UI INTERACTION & ANIMATIONS (Sidebar tabs & Modals)
@@ -426,6 +677,34 @@ navLinks.forEach(link => {
         const targetId = link.getAttribute('data-view');
         const targetView = document.getElementById(targetId);
 
+        // Manage rainfall landing and sound lifecycle
+        if (targetId === 'view-rainfall') {
+            const landing = document.getElementById('rainfall-landing');
+            if (landing) {
+                landing.style.display = 'flex';
+                setTimeout(() => {
+                    landing.style.opacity = '1';
+                    landing.style.visibility = 'visible';
+                    landing.style.pointerEvents = 'auto';
+                }, 20);
+            }
+            if (ambientRainFrame) cancelAnimationFrame(ambientRainFrame);
+            if (splashRainFrame) cancelAnimationFrame(splashRainFrame);
+            createRainAnimation('splash-rain-canvas', 650, 'rgba(0, 242, 254, 0.7)', (f) => splashRainFrame = f);
+            createRainAnimation('ambient-rain-canvas', 180, 'rgba(0, 242, 254, 0.25)', (f) => ambientRainFrame = f);
+        } else {
+            stopRainSound();
+            if (ambientRainFrame) cancelAnimationFrame(ambientRainFrame);
+            if (splashRainFrame) cancelAnimationFrame(splashRainFrame);
+            const landing = document.getElementById('rainfall-landing');
+            if (landing) {
+                landing.style.opacity = '0';
+                landing.style.visibility = 'hidden';
+                landing.style.display = 'none';
+                landing.style.pointerEvents = 'none';
+            }
+        }
+
         // Hide all views except target
         viewSections.forEach(view => {
             if (view !== targetView) {
@@ -438,27 +717,29 @@ navLinks.forEach(link => {
             }
         });
 
-        // Show target view immediately
-        targetView.style.display = 'block';
+        if (targetView) {
+            // Show target view immediately
+            targetView.style.display = 'block';
 
-        // Small delay to allow display:block to apply before removing hidden to trigger opacity transition
-        setTimeout(() => {
-            targetView.classList.remove('hidden');
+            // Small delay to allow display:block to apply before removing hidden to trigger opacity transition
+            setTimeout(() => {
+                targetView.classList.remove('hidden');
 
-            // If returning to command view, ensure map fixes its size (Leaflet bug workaround when hidden)
-            if (targetId === 'view-command') {
-                map.invalidateSize();
-            }
-            if (targetId === 'view-terrain') {
-                initTerrain();
-                setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-            }
-            if (targetId === 'view-rainfall' || targetId === 'view-validation') {
-                initCharts();
-                if (targetId === 'view-validation') loadIncidents();
-                setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-            }
-        }, 50);
+                // If returning to command view, ensure map fixes its size (Leaflet bug workaround when hidden)
+                if (targetId === 'view-command' && map) {
+                    map.invalidateSize();
+                }
+                if (targetId === 'view-terrain') {
+                    initTerrain();
+                    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+                }
+                if (targetId === 'view-rainfall' || targetId === 'view-validation') {
+                    initCharts();
+                    if (targetId === 'view-validation') loadIncidents();
+                    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+                }
+            }, 50);
+        }
     });
 });
 
@@ -468,55 +749,59 @@ const telemetryModal = document.getElementById('telemetry-modal');
 const closeModal = document.getElementById('close-telemetry');
 const textOutput = document.getElementById('telemetry-output');
 
-inspectBtn.addEventListener('click', () => {
-    telemetryModal.style.display = 'flex';
-    setTimeout(() => telemetryModal.classList.remove('hidden'), 50);
+if (inspectBtn && telemetryModal && textOutput) {
+    inspectBtn.addEventListener('click', () => {
+        telemetryModal.style.display = 'flex';
+        setTimeout(() => telemetryModal.classList.remove('hidden'), 50);
 
-    // Simulate animated terminal extraction of telemetry
-    textOutput.innerHTML = 'Establishing secure link to Open-Meteo...\nFetching spatial tensors...\n';
+        // Simulate animated terminal extraction of telemetry
+        textOutput.innerHTML = 'Establishing secure link to Open-Meteo...\nFetching spatial tensors...\n';
 
-    let simLines = [
-        '[OK] Handshake completed w/ api.open-meteo.com',
-        '[SYS] Querying geospatial polygon for NH-07 / 30.1N 78.5E',
-        '-------------------------------------------',
-    ];
+        let simLines = [
+            '[OK] Handshake completed w/ api.open-meteo.com',
+            '[SYS] Querying geospatial polygon for NH-07 / 30.1N 78.5E',
+            '-------------------------------------------',
+        ];
 
-    if (allSegments.length > 0) {
-        allSegments.forEach(s => {
-            let wind = s.rainfall.wind_speed ? s.rainfall.wind_speed + 'km/h' : 'N/A';
-            let pressure = s.rainfall.pressure_msl ? s.rainfall.pressure_msl + 'hPa' : 'N/A';
-            let temp = s.rainfall.temperature ? s.rainfall.temperature + '°C' : 'N/A';
-            simLines.push(`[DAT] ${s.id} | Rain: ${s.rainfall.accum_24h_mm}mm | Wind: ${wind} | Press: ${pressure} | Temp: ${temp} | FoS: ${s.fos.min.toFixed(2)}`);
-        });
+        if (allSegments.length > 0) {
+            allSegments.forEach(s => {
+                let wind = s.rainfall.wind_speed ? s.rainfall.wind_speed + 'km/h' : 'N/A';
+                let pressure = s.rainfall.pressure_msl ? s.rainfall.pressure_msl + 'hPa' : 'N/A';
+                let temp = s.rainfall.temperature ? s.rainfall.temperature + '°C' : 'N/A';
+                simLines.push(`[DAT] ${s.id} | Rain: ${s.rainfall.accum_24h_mm}mm | Wind: ${wind} | Press: ${pressure} | Temp: ${temp} | FoS: ${s.fos.min.toFixed(2)}`);
+            });
 
-        const testSeg = allSegments[0];
-        if (testSeg && testSeg.rainfall.sunrise) {
-            simLines.push(`[ASTRO] Sunrise: ${testSeg.rainfall.sunrise.split('T')[1] || 'N/A'} | Sunset: ${testSeg.rainfall.sunset.split('T')[1] || 'N/A'}`);
-        }
-    } else {
-        simLines.push('[ERR] No active segment data in buffer.');
-    }
-
-    simLines.push('-------------------------------------------');
-    simLines.push('[OK] Stream synced. Real-time updates active.');
-
-    let lineIndex = 0;
-    const interval = setInterval(() => {
-        if (lineIndex < simLines.length) {
-            textOutput.innerHTML += simLines[lineIndex] + '\n';
-            lineIndex++;
+            const testSeg = allSegments[0];
+            if (testSeg && testSeg.rainfall.sunrise) {
+                simLines.push(`[ASTRO] Sunrise: ${testSeg.rainfall.sunrise.split('T')[1] || 'N/A'} | Sunset: ${testSeg.rainfall.sunset.split('T')[1] || 'N/A'}`);
+            }
         } else {
-            clearInterval(interval);
+            simLines.push('[ERR] No active segment data in buffer.');
         }
-    }, 150);
-});
 
-closeModal.addEventListener('click', () => {
-    telemetryModal.classList.add('hidden');
-    setTimeout(() => {
-        telemetryModal.style.display = 'none';
-    }, 300);
-});
+        simLines.push('-------------------------------------------');
+        simLines.push('[OK] Stream synced. Real-time updates active.');
+
+        let lineIndex = 0;
+        const interval = setInterval(() => {
+            if (lineIndex < simLines.length) {
+                textOutput.innerHTML += simLines[lineIndex] + '\n';
+                lineIndex++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 150);
+    });
+}
+
+if (closeModal && telemetryModal) {
+    closeModal.addEventListener('click', () => {
+        telemetryModal.classList.add('hidden');
+        setTimeout(() => {
+            telemetryModal.style.display = 'none';
+        }, 300);
+    });
+}
 
 // ----------------------------------------------------
 // Ticker Interface Logic
@@ -663,6 +948,11 @@ let terrainScene, terrainCamera, terrainRenderer, terrainControls;
 let terrainAnimationId = null;
 
 function initTerrain() {
+    if (typeof THREE === 'undefined') {
+        console.warn('Three.js library is not loaded');
+        return;
+    }
+
     const container = document.getElementById('terrain-canvas');
     if (!container) {
         console.warn('terrain-canvas container not found');
@@ -692,8 +982,8 @@ function initTerrain() {
     console.log('Initializing 3D Terrain with size:', initW, 'x', initH);
 
     terrainScene = new THREE.Scene();
-    terrainScene.background = new THREE.Color(0x0a0e1c);
-    terrainScene.fog = new THREE.FogExp2(0x0a0e1c, 0.02);
+    terrainScene.background = new THREE.Color(0x02050e);
+    terrainScene.fog = new THREE.FogExp2(0x02050e, 0.015);
 
     terrainCamera = new THREE.PerspectiveCamera(45, initW / initH, 0.1, 1000);
     terrainCamera.position.set(0, 40, 60);
@@ -702,7 +992,7 @@ function initTerrain() {
     terrainRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     terrainRenderer.setSize(initW, initH);
     terrainRenderer.setPixelRatio(window.devicePixelRatio);
-    terrainRenderer.setClearColor(0x0a0e1c, 1);
+    terrainRenderer.setClearColor(0x02050e, 1);
 
     // Clear container first
     container.innerHTML = '';
@@ -762,13 +1052,13 @@ function initTerrain() {
         console.warn('OrbitControls not loaded - using automated camera orbit fallback');
     }
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0x404040, 1.5);
+    // High-Contrast Cyber Lights
+    const ambient = new THREE.AmbientLight(0x0a192f, 2.0);
     terrainScene.add(ambient);
-    const dirLight = new THREE.DirectionalLight(0x00f2fe, 1.2);
+    const dirLight = new THREE.DirectionalLight(0x00f2fe, 2.2);
     dirLight.position.set(100, 100, 50);
     terrainScene.add(dirLight);
-    const redLight = new THREE.DirectionalLight(0xff4757, 0.5);
+    const redLight = new THREE.DirectionalLight(0xff2a55, 1.4);
     redLight.position.set(-100, 50, -50);
     terrainScene.add(redLight);
 
@@ -789,12 +1079,13 @@ function initTerrain() {
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial({
-        color: 0x0a1929,
-        emissive: 0x051320,
+        color: 0x00f2fe,
+        emissive: 0x003d52,
         wireframe: true,
-        roughness: 0.5,
+        roughness: 0.2,
+        metalness: 0.8,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.95
     });
 
     const terrain = new THREE.Mesh(geometry, material);
@@ -1205,7 +1496,6 @@ function initTerrain() {
 // Data Visualizations (Chart.js)
 // ----------------------------------------------------
 
-// Data Visualizations (Chart.js)
 let chartsInitialized = false;
 function initCharts() {
     if (chartsInitialized) return;
@@ -1319,13 +1609,14 @@ function initCharts() {
 // ADVANCED UPGRADE FEATURES (Profile, Cloudburst & Bulletin)
 // ----------------------------------------------------
 
-
 window.rainChartInstance = null;
 window.radarChartInstance = null;
 window.confChartInstance = null;
 let profileChartInstance = null;
 
 function updateChartData(seg) {
+    if (!seg) return;
+
     if (window.rainChartInstance) {
         // Build mock time sequence based on current accum and rate for aesthetic UI
         const basePlot = seg.rainfall.accum_24h_mm || 0;
@@ -1373,7 +1664,7 @@ function updateChartData(seg) {
 
         window.radarChartInstance.data.datasets[0].borderColor = color;
         window.radarChartInstance.data.datasets[0].backgroundColor = color.replace(')', ', 0.2)').replace('rgb', 'rgba');
-        if(window.radarChartInstance.data.datasets[0].backgroundColor.indexOf('#') === 0) {
+        if (window.radarChartInstance.data.datasets[0].backgroundColor.indexOf('#') === 0) {
             window.radarChartInstance.data.datasets[0].backgroundColor = color + '33'; // hex alpha
         }
         window.radarChartInstance.data.datasets[0].pointBackgroundColor = color;
@@ -1386,11 +1677,12 @@ function updateChartData(seg) {
 }
 
 function updateTerrainData(seg) {
+    if (!seg) return;
     // 3D HUD Elements update
     const uiTitle = document.getElementById('terrain-hud-title');
     const uiStats = document.getElementById('terrain-hud-stats');
 
-    if(uiTitle && uiStats) {
+    if (uiTitle && uiStats) {
         uiTitle.innerHTML = `<span style="color:#00f2fe; text-shadow: 0 0 10px #00f2fe;">${seg.id} : ${seg.name}</span> | <span style="font-size:12px; color:#a0a0a0">3D TOPOLOGY SCAN</span>`;
         uiStats.innerHTML = `
             <div style="margin-top:10px; font-size:12px; line-height:1.6;">
@@ -1406,14 +1698,17 @@ function updateTerrainData(seg) {
     }
 }
 
-
 function showSegmentProfile(segId) {
-    updateChartData(allSegments.find(s => s.id === segId));
     const seg = allSegments.find(s => s.id === segId);
     if (!seg) return;
 
+    updateChartData(seg);
+
     const modal = document.getElementById('profile-modal');
-    document.getElementById('profile-title').textContent = `${seg.id}: ${seg.name} (KM ${seg.km})`;
+    if (!modal) return;
+
+    const titleEl = document.getElementById('profile-title');
+    if (titleEl) titleEl.textContent = `${seg.id}: ${seg.name} (KM ${seg.km})`;
 
     modal.style.display = 'flex';
     setTimeout(() => modal.classList.remove('hidden'), 50);
@@ -1421,26 +1716,30 @@ function showSegmentProfile(segId) {
     const forecastBoxes = document.getElementById('profile-forecast-boxes');
     const f = seg.fos_forecast || { "6h": seg.fos.min, "12h": seg.fos.min, "24h": seg.fos.min };
 
-    forecastBoxes.innerHTML = `
-        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace;">+6H PROJECTED FoS</div>
-            <div style="font-size: 20px; font-weight: bold; color: ${f['6h'] < 1.0 ? '#ff4757' : (f['6h'] < 1.35 ? '#ffa502' : '#2ed573')}; font-family: 'DM Mono';">${f['6h'].toFixed(2)}</div>
-        </div>
-        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace;">+12H PROJECTED FoS</div>
-            <div style="font-size: 20px; font-weight: bold; color: ${f['12h'] < 1.0 ? '#ff4757' : (f['12h'] < 1.35 ? '#ffa502' : '#2ed573')}; font-family: 'DM Mono';">${f['12h'].toFixed(2)}</div>
-        </div>
-        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace;">+24H PROJECTED FoS</div>
-            <div style="font-size: 20px; font-weight: bold; color: ${f['24h'] < 1.0 ? '#ff4757' : (f['24h'] < 1.35 ? '#ffa502' : '#2ed573')}; font-family: 'DM Mono';">${f['24h'].toFixed(2)}</div>
-        </div>
-    `;
+    if (forecastBoxes) {
+        forecastBoxes.innerHTML = `
+            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace;">+6H PROJECTED FoS</div>
+                <div style="font-size: 20px; font-weight: bold; color: ${f['6h'] < 1.0 ? '#ff4757' : (f['6h'] < 1.35 ? '#ffa502' : '#2ed573')}; font-family: 'DM Mono';">${f['6h'].toFixed(2)}</div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace;">+12H PROJECTED FoS</div>
+                <div style="font-size: 20px; font-weight: bold; color: ${f['12h'] < 1.0 ? '#ff4757' : (f['12h'] < 1.35 ? '#ffa502' : '#2ed573')}; font-family: 'DM Mono';">${f['12h'].toFixed(2)}</div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace;">+24H PROJECTED FoS</div>
+                <div style="font-size: 20px; font-weight: bold; color: ${f['24h'] < 1.0 ? '#ff4757' : (f['24h'] < 1.35 ? '#ffa502' : '#2ed573')}; font-family: 'DM Mono';">${f['24h'].toFixed(2)}</div>
+            </div>
+        `;
+    }
 
-    const ctx = document.getElementById('profileChart').getContext('2d');
+    const profileChartEl = document.getElementById('profileChart');
+    if (!profileChartEl || typeof Chart === 'undefined') return;
+    const ctx = profileChartEl.getContext('2d');
     if (profileChartInstance) profileChartInstance.destroy();
 
-    const elevProfile = seg.terrain.profile || [300, 320, 350, 410, 480, 520, 490, 420, 380, 350];
-    const slopeProfile = seg.terrain.slope_profile || [12, 18, 28, 38, 45, 42, 36, 25, 18, 14];
+    const elevProfile = (seg.terrain && seg.terrain.profile) || [300, 320, 350, 410, 480, 520, 490, 420, 380, 350];
+    const slopeProfile = (seg.terrain && seg.terrain.slope_profile) || [12, 18, 28, 38, 45, 42, 36, 25, 18, 14];
 
     profileChartInstance = new Chart(ctx, {
         type: 'line',
@@ -1498,9 +1797,9 @@ if (simBtn) {
         const simBtnText = document.getElementById('sim-btn-text');
 
         if (!isSimulating) {
-            simBtnText.textContent = 'Demo Started...';
+            if (simBtnText) simBtnText.textContent = 'Demo Started...';
             isSimulating = true;
-            simBtnText.textContent = '↻ Stop Alert Demo';
+            if (simBtnText) simBtnText.textContent = '↻ Stop Alert Demo';
             simBtn.style.background = 'linear-gradient(135deg, rgba(46, 213, 115, 0.2), rgba(0, 242, 254, 0.2))';
             simBtn.style.borderColor = 'rgba(46, 213, 115, 0.4)';
             simBtn.style.color = '#2ed573';
@@ -1515,10 +1814,10 @@ if (simBtn) {
                 await fetchSegments();
             } catch (e) {
                 console.error('Simulation error:', e);
-                simBtnText.textContent = 'Simulate Error';
+                if (simBtnText) simBtnText.textContent = 'Simulate Error';
             }
         } else {
-            simBtnText.textContent = 'Alert Demo';
+            if (simBtnText) simBtnText.textContent = 'Alert Demo';
             isSimulating = false;
             simBtn.style.background = 'linear-gradient(135deg, rgba(255, 71, 87, 0.2), rgba(255, 165, 2, 0.2))';
             simBtn.style.borderColor = 'rgba(255, 71, 87, 0.4)';
@@ -1534,7 +1833,7 @@ if (simBtn) {
                 await fetchSegments();
             } catch (e) {
                 console.error('Reset error:', e);
-                simBtnText.textContent = 'Reset Error';
+                if (simBtnText) simBtnText.textContent = 'Reset Error';
             }
         }
     };
@@ -1547,17 +1846,21 @@ if (bulletinBtn) {
         const modal = document.getElementById('bulletin-modal');
         const body = document.getElementById('bulletin-body');
 
-        modal.style.display = 'flex';
-        setTimeout(() => modal.classList.remove('hidden'), 50);
+        if (modal) {
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.remove('hidden'), 50);
+        }
 
-        body.innerHTML = '<i>Fetching USDMA Disaster Advisory Stream...</i>';
+        if (body) {
+            body.innerHTML = '<i>Fetching USDMA Disaster Advisory Stream...</i>';
+        }
 
         try {
             const resp = await fetch('/api/bulletin');
             const data = await resp.json();
 
             let critHTML = '';
-            if (data.critical_sectors.length > 0) {
+            if (data.critical_sectors && data.critical_sectors.length > 0) {
                 critHTML = data.critical_sectors.map(c => `
                     <div style="background: rgba(255, 71, 87, 0.15); border: 1px solid rgba(255, 71, 87, 0.4); padding: 12px; border-radius: 6px; margin-bottom: 10px;">
                         <div style="color: #ff4757; font-weight: bold;">🚨 CRITICAL SECTOR: ${c.id} — ${c.name} (KM ${c.km})</div>
@@ -1569,310 +1872,270 @@ if (bulletinBtn) {
                 critHTML = '<div style="color: #2ed573; background: rgba(46, 213, 115, 0.1); border: 1px solid rgba(46, 213, 115, 0.3); padding: 12px; border-radius: 6px;">🟢 NOMINAL STATUS: No sectors currently breach critical stability threshold. Continuous monitoring active.</div>';
             }
 
-            body.innerHTML = `
-                <div style="border-bottom: 1px solid var(--card-border); padding-bottom: 12px; margin-bottom: 16px;">
-                    <div style="color: var(--accent-cyan); font-weight: bold; font-size: 14px;">${data.title}</div>
-                    <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">AUTHORITY: ${data.issuing_authority} | TIMESTAMP: ${data.timestamp}</div>
-                    <div style="color: var(--text-muted); font-size: 11px;">MODE: ${data.mode} | CORRIDOR: ${data.corridor}</div>
-                </div>
+            if (body) {
+                body.innerHTML = `
+                    <div style="border-bottom: 1px solid var(--card-border); padding-bottom: 12px; margin-bottom: 16px;">
+                        <div style="color: var(--accent-cyan); font-weight: bold; font-size: 14px;">${data.title}</div>
+                        <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">AUTHORITY: ${data.issuing_authority} | TIMESTAMP: ${data.timestamp}</div>
+                        <div style="color: var(--text-muted); font-size: 11px;">MODE: ${data.mode} | CORRIDOR: ${data.corridor}</div>
+                    </div>
 
-                <div style="margin-bottom: 16px;">
-                    <div style="font-weight: bold; margin-bottom: 8px; color: #fff;">SECTOR STATUS SUMMARY (${data.total_monitored_sectors} Monitored Sectors):</div>
-                    <div style="display: flex; gap: 16px;">
-                        <span>🔴 Unstable: <strong style="color: #ff4757">${data.unstable_count}</strong></span>
-                        <span>🟠 Marginal: <strong style="color: #ffa502">${data.marginal_count}</strong></span>
-                                                                           <span>Overall Level: <strong style="color: ${data.unstable_count > 0 ? '#ff4757' : '#2ed573'}">${data.overall_status}</strong></span>
-                                                                       </div>
-                                                                   </div>
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-weight: bold; margin-bottom: 8px; color: #fff;">SECTOR STATUS SUMMARY (${data.total_monitored_sectors} Monitored Sectors):</div>
+                        <div style="display: flex; gap: 16px;">
+                            <span>🔴 Unstable: <strong style="color: #ff4757">${data.unstable_count}</strong></span>
+                            <span>🟠 Marginal: <strong style="color: #ffa502">${data.marginal_count}</strong></span>
+                            <span>Overall Level: <strong style="color: ${data.unstable_count > 0 ? '#ff4757' : '#2ed573'}">${data.overall_status}</strong></span>
+                        </div>
+                    </div>
 
-                                                                   <div style="margin-bottom: 16px;">
-                                                                       <div style="font-weight: bold; margin-bottom: 8px; color: #fff;">RECOMMENDED EMERGENCY ADVISORIES:</div>
-                                                                       ${critHTML}
-                                                                   </div>
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-weight: bold; margin-bottom: 8px; color: #fff;">RECOMMENDED EMERGENCY ADVISORIES:</div>
+                        ${critHTML}
+                    </div>
 
-                                                                   <div style="font-size: 10px; color: var(--text-muted); font-style: italic;">
-                                                                       ${data.disclaimer}
-                                                                   </div>
-                                                               `;
-                                                           } catch (e) {
-                                                               body.innerHTML = '<span style="color: #ff4757;">Failed to generate bulletin stream.</span>';
-                                                           }
-                                                       };
-                                                   }
+                    <div style="font-size: 10px; color: var(--text-muted); font-style: italic;">
+                        ${data.disclaimer}
+                    </div>
+                `;
+            }
+        } catch (e) {
+            if (body) {
+                body.innerHTML = '<span style="color: #ff4757;">Failed to generate bulletin stream.</span>';
+            }
+        }
+    };
+}
 
-                                                   // Copy Advisory
-                                                   const copyBtn = document.getElementById('copy-bulletin-btn');
-                                                   if (copyBtn) {
-                                                       copyBtn.onclick = () => {
-                                                           const text = document.getElementById('bulletin-body').innerText;
-                                                           navigator.clipboard.writeText(text);
-                                                           const og = copyBtn.textContent;
-                                                           copyBtn.textContent = 'Copied ✓';
-                                                           setTimeout(() => copyBtn.textContent = og, 2000);
-                                                       };
-                                                   }
+// Copy Advisory
+const copyBtn = document.getElementById('copy-bulletin-btn');
+if (copyBtn) {
+    copyBtn.onclick = () => {
+        const bodyEl = document.getElementById('bulletin-body');
+        if (!bodyEl) return;
+        const text = bodyEl.innerText;
+        navigator.clipboard.writeText(text);
+        const og = copyBtn.textContent;
+        copyBtn.textContent = 'Copied ✓';
+        setTimeout(() => copyBtn.textContent = og, 2000);
+    };
+}
 
-                                                   // Close Modals
-                                                   const closeBul = document.getElementById('close-bulletin');
-                                                   if (closeBul) {
-                                                       closeBul.onclick = () => {
-                                                           document.getElementById('bulletin-modal').classList.add('hidden');
-                                                           setTimeout(() => document.getElementById('bulletin-modal').style.display = 'none', 300);
-                                                       };
-                                                   }
+// Close Modals
+const closeBul = document.getElementById('close-bulletin');
+if (closeBul) {
+    closeBul.onclick = () => {
+        const modal = document.getElementById('bulletin-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+    };
+}
 
-                                                   const closeProf = document.getElementById('close-profile');
-                                                   if (closeProf) {
-                                                       closeProf.onclick = () => {
-                                                           document.getElementById('profile-modal').classList.add('hidden');
-                                                           setTimeout(() => document.getElementById('profile-modal').style.display = 'none', 300);
-                                                       };
-                                                   }
+const closeProf = document.getElementById('close-profile');
+if (closeProf) {
+    closeProf.onclick = () => {
+        const modal = document.getElementById('profile-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+    };
+}
 
+// ----------------------------------------------------
+// Ground-Truth Incident Feedback Loop (Requirement 10)
+// ----------------------------------------------------
+async function loadIncidents() {
+    try {
+        const response = await fetch('/api/incidents');
+        if (response.ok) {
+            const incidents = await response.json();
+            renderIncidents(incidents);
+            const countBadge = document.getElementById('incident-count');
+            if (countBadge) countBadge.textContent = incidents.length + ' LOGGED';
+        }
+    } catch (e) {
+        console.warn('Could not load incidents:', e);
+    }
+}
 
+function renderIncidents(incidents) {
+    const container = document.getElementById('incident-rows');
+    if (!container) return;
 
-                                                   // ----------------------------------------------------
-                                                   // Ground-Truth Incident Feedback Loop (Requirement 10)
-                                                   // ----------------------------------------------------
-                                                   async function loadIncidents() {
-                                                       try {
-                                                           const response = await fetch('/api/incidents');
-                                                           if (response.ok) {
-                                                               const incidents = await response.json();
-                                                               renderIncidents(incidents);
-                                                               const countBadge = document.getElementById('incident-count');
-                                                               if (countBadge) countBadge.textContent = incidents.length + ' LOGGED';
-                                                           }
-                                                       } catch (e) {
-                                                           console.warn('Could not load incidents:', e);
-                                                       }
-                                                   }
+    if (!incidents || incidents.length === 0) {
+        container.innerHTML = '<div style="padding:20px; color:var(--text-muted); font-size:12px; text-align:center;">No field incidents logged yet.</div>';
+        return;
+    }
 
-                                                   function renderIncidents(incidents) {
-                                                       const container = document.getElementById('incident-rows');
-                                                       if (!container) return;
+    container.innerHTML = incidents.slice().reverse().map((inc, idx) => {
+        const t = new Date(inc.timestamp);
+        const timeStr = t.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) + ' ' + t.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+        const severityClass = (inc.severity === 'critical' || inc.severity === 'high') ? 'unstable' : inc.severity === 'medium' ? 'marginal' : 'stable';
+        const typeLabel = (inc.type || '').replace(/_/g, ' ').toUpperCase();
+        return `
+            <div class="row" style="--i:${idx};">
+                <div><b>${timeStr}</b></div>
+                <div>${inc.segment_id || '-'}</div>
+                <span class="rain">${typeLabel}</span>
+                <span class="status ${severityClass}" style="font-size:9px; padding:4px 8px;">${(inc.severity||'').toUpperCase()}</span>
+                <span class="confidence-text">✓ LOGGED</span>
+            </div>
+        `;
+    }).join('');
+}
 
-                                                       if (!incidents || incidents.length === 0) {
-                                                           container.innerHTML = '<div style="padding:20px; color:var(--text-muted); font-size:12px; text-align:center;">No field incidents logged yet.</div>';
-                                                           return;
-                                                       }
+const incidentForm = document.getElementById('incident-form');
+if (incidentForm) {
+    incidentForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('inc-status');
 
-                                                       container.innerHTML = incidents.slice().reverse().map((inc, idx) => {
-                                                           const t = new Date(inc.timestamp);
-                                                           const timeStr = t.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) + ' ' + t.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
-                                                           const severityClass = (inc.severity === 'critical' || inc.severity === 'high') ? 'unstable' : inc.severity === 'medium' ? 'marginal' : 'stable';
-                                                           const typeLabel = (inc.type || '').replace(/_/g, ' ').toUpperCase();
-                                                           return `
-                                                               <div class="row" style="--i:${idx};">
-                                                                   <div><b>${timeStr}</b></div>
-                                                                   <div>${inc.segment_id || '-'}</div>
-                                                                   <span class="rain">${typeLabel}</span>
-                                                                   <span class="status ${severityClass}" style="font-size:9px; padding:4px 8px;">${(inc.severity||'').toUpperCase()}</span>
-                                                                   <span class="confidence-text">✓ LOGGED</span>
-                                                               </div>
-                                                           `;
-                                                       }).join('');
-                                                   }
+        const segmentEl = document.getElementById('inc-segment');
+        const typeEl = document.getElementById('inc-type');
+        const severityEl = document.getElementById('inc-severity');
+        const rainfallEl = document.getElementById('inc-rainfall');
+        const descriptionEl = document.getElementById('inc-description');
 
-                                                   const incidentForm = document.getElementById('incident-form');
-                                                   if (incidentForm) {
-                                                       incidentForm.addEventListener('submit', async (e) => {
-                                                           e.preventDefault();
-                                                           const statusEl = document.getElementById('inc-status');
+        const segmentId = segmentEl ? segmentEl.value : '';
+        const type = typeEl ? typeEl.value : '';
+        const severity = severityEl ? severityEl.value : '';
+        const rainfall = rainfallEl ? (parseFloat(rainfallEl.value) || 0) : 0;
+        const description = descriptionEl ? descriptionEl.value.trim() : '';
 
-                                                           const segmentId = document.getElementById('inc-segment').value;
-                                                           const type = document.getElementById('inc-type').value;
-                                                           const severity = document.getElementById('inc-severity').value;
-                                                           const rainfall = parseFloat(document.getElementById('inc-rainfall').value) || 0;
-                                                           const description = document.getElementById('inc-description').value.trim();
+        // Find FoS of the selected segment from current data
+        const seg = allSegments.find(s => s.id === segmentId);
+        const fosAtTime = seg ? seg.fos : null;
 
-                                                           // Find FoS of the selected segment from current data
-                                                           const seg = allSegments.find(s => s.id === segmentId);
-                                                           const fosAtTime = seg ? seg.fos : null;
+        if (statusEl) {
+            statusEl.textContent = 'Transmitting...';
+            statusEl.style.color = '#00f2fe';
+        }
 
-                                                           statusEl.textContent = 'Transmitting...';
-                                                           statusEl.style.color = '#00f2fe';
+        try {
+            const res = await fetch('/api/incidents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    segment_id: segmentId,
+                    type: type,
+                    severity: severity,
+                    description: description,
+                    fos_at_time: fosAtTime,
+                    rainfall_at_time: rainfall
+                })
+            });
 
-                                                           try {
-                                                               const res = await fetch('/api/incidents', {
-                                                                   method: 'POST',
-                                                                   headers: { 'Content-Type': 'application/json' },
-                                                                   body: JSON.stringify({
-                                                                       segment_id: segmentId,
-                                                                       type: type,
-                                                                       severity: severity,
-                                                                       description: description,
-                                                                       fos_at_time: fosAtTime,
-                                                                       rainfall_at_time: rainfall
-                                                                   })
-                                                               });
+            if (res.ok) {
+                if (statusEl) {
+                    statusEl.textContent = '✓ Incident logged';
+                    statusEl.style.color = '#2ed573';
+                }
+                incidentForm.reset();
+                loadIncidents();
+                if (statusEl) setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            } else {
+                if (statusEl) {
+                    statusEl.textContent = '✗ Server error';
+                    statusEl.style.color = '#ff4757';
+                }
+            }
+        } catch (err) {
+            if (statusEl) {
+                statusEl.textContent = '✗ Network error';
+                statusEl.style.color = '#ff4757';
+            }
+        }
+    });
+}
 
-                                                               if (res.ok) {
-                                                                   statusEl.textContent = '✓ Incident logged';
-                                                                   statusEl.style.color = '#2ed573';
-                                                                   incidentForm.reset();
-                                                                   loadIncidents();
-                                                                   setTimeout(() => { statusEl.textContent = ''; }, 3000);
-                                                               } else {
-                                                                   statusEl.textContent = '✗ Server error';
-                                                                   statusEl.style.color = '#ff4757';
-                                                               }
-                                                           } catch (err) {
-                                                               statusEl.textContent = '✗ Network error';
-                                                               statusEl.style.color = '#ff4757';
-                                                           }
-                                                       });
-                                                   }
+// Load incidents on startup
+loadIncidents();
 
-                                                   // Load incidents on startup
-                                                   loadIncidents();
+// Dismiss alarm button
+const dismissBtn = document.getElementById('dismiss-emergency');
+if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+        window.emergencyMuted = true;
+        const bannerEl = document.getElementById('emergency-banner');
+        if (bannerEl) bannerEl.classList.remove('show');
+        if (window.alarmInterval) {
+            clearInterval(window.alarmInterval);
+            window.alarmInterval = null;
+        }
 
+        // Reset mute if it goes stable later
+        setTimeout(() => {
+            const unstableCount = allSegments.filter(s => s.risk_level === 'UNSTABLE').length;
+            if (unstableCount === 0) window.emergencyMuted = false;
+        }, 10000);
+    });
+}
 
-                                                   // ----------------------------------------------------
-                                                   // Tactical UI Audio Feedback (Procedural Web Audio API)
-                                                   // ----------------------------------------------------
-                                                   const AudioContext = window.AudioContext || window.webkitAudioContext;
-                                                   const uiAudioCtx = new AudioContext();
+// Heavy Storm UI & Canvas Engine
+let stormRainFrame;
+let lightningInterval;
+function toggleStormEffect(active) {
+    const stormCont = document.getElementById('storm-container');
+    const stormRain = document.getElementById('storm-rain-canvas');
+    const stormLig = document.getElementById('storm-lightning');
+    if (!stormCont || !stormRain) return;
 
-                                                   function playUIBeep(type = 'click') {
-                                                       if (uiAudioCtx.state === 'suspended') uiAudioCtx.resume();
+    if (active) {
+        stormCont.style.display = 'block';
+        playUIBeep('error'); // simulate siren/alert beep
 
-                                                       const osc = uiAudioCtx.createOscillator();
-                                                       const gain = uiAudioCtx.createGain();
+        // Rain canvas logic
+        const ctx = stormRain.getContext('2d');
+        stormRain.width = window.innerWidth;
+        stormRain.height = window.innerHeight;
+        const raindrops = [];
+        for (let i = 0; i < 300; i++) {
+            raindrops.push({
+                x: Math.random() * stormRain.width,
+                y: Math.random() * stormRain.height,
+                len: Math.random() * 20 + 10,
+                speed: Math.random() * 15 + 15
+            });
+        }
 
-                                                       osc.connect(gain);
-                                                       gain.connect(uiAudioCtx.destination);
+        function drawRain() {
+            ctx.clearRect(0, 0, stormRain.width, stormRain.height);
+            ctx.strokeStyle = 'rgba(174,194,224,0.6)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i < raindrops.length; i++) {
+                let d = raindrops[i];
+                ctx.moveTo(d.x, d.y);
+                ctx.lineTo(d.x - d.len / 4, d.y + d.len);
+                d.y += d.speed;
+                d.x -= d.speed / 4;
+                if (d.y > stormRain.height) {
+                    d.y = -20;
+                    d.x = Math.random() * stormRain.width + 50;
+                }
+            }
+            ctx.stroke();
+            stormRainFrame = requestAnimationFrame(drawRain);
+        }
+        drawRain();
 
-                                                       const now = uiAudioCtx.currentTime;
+        // Lightning logic
+        lightningInterval = setInterval(() => {
+            if (Math.random() > 0.6 && stormLig) {
+                stormLig.style.animation = 'none';
+                void stormLig.offsetWidth; // trigger reflow
+                stormLig.style.animation = 'strobeLightning 0.5s ease-out';
+                setTimeout(() => playUIBeep('error'), 100);
+            }
+        }, 3000);
 
-                                                       if (type === 'click') {
-                                                           // High pitched short tech ping
-                                                           osc.type = 'sine';
-                                                           osc.frequency.setValueAtTime(1200, now);
-                                                           osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
-                                                           gain.gain.setValueAtTime(0, now);
-                                                           gain.gain.linearRampToValueAtTime(0.05, now + 0.01);
-                                                           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-                                                           osc.start(now);
-                                                           osc.stop(now + 0.06);
-                                                       } else if (type === 'hover') {
-                                                           // Very subtle soft click
-                                                           osc.type = 'triangle';
-                                                           osc.frequency.setValueAtTime(400, now);
-                                                           gain.gain.setValueAtTime(0, now);
-                                                           gain.gain.linearRampToValueAtTime(0.01, now + 0.01);
-                                                           gain.gain.linearRampToValueAtTime(0, now + 0.03);
-                                                           osc.start(now);
-                                                           osc.stop(now + 0.04);
-                                                       } else if (type === 'confirm') {
-                                                           // Double ping (e.g. calibration)
-                                                           osc.type = 'sine';
-                                                           osc.frequency.setValueAtTime(1000, now);
-                                                           osc.frequency.setValueAtTime(1400, now + 0.1);
-
-                                                           gain.gain.setValueAtTime(0, now);
-                                                           gain.gain.linearRampToValueAtTime(0.08, now + 0.02);
-                                                           gain.gain.linearRampToValueAtTime(0.001, now + 0.08);
-
-                                                           gain.gain.setValueAtTime(0, now + 0.1);
-                                                           gain.gain.linearRampToValueAtTime(0.08, now + 0.12);
-                                                           gain.gain.linearRampToValueAtTime(0.001, now + 0.3);
-
-                                                           osc.start(now);
-                                                           osc.stop(now + 0.35);
-                                                       } else if (type === 'error') {
-                                                           osc.type = 'sawtooth';
-                                                           osc.frequency.setValueAtTime(200, now);
-                                                           osc.frequency.linearRampToValueAtTime(100, now + 0.2);
-                                                           gain.gain.setValueAtTime(0, now);
-                                                           gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
-                                                           gain.gain.linearRampToValueAtTime(0.001, now + 0.2);
-                                                           osc.start(now);
-                                                           osc.stop(now + 0.25);
-                                                       }
-                                                   }
-
-                                                   // Dismiss alarm button
-                                                   const dismissBtn = document.getElementById('dismiss-emergency');
-                                                   if (dismissBtn) {
-                                                       dismissBtn.addEventListener('click', () => {
-                                                           window.emergencyMuted = true;
-                                                           document.getElementById('emergency-banner').classList.remove('show');
-                                                           if (window.alarmInterval) {
-                                                               clearInterval(window.alarmInterval);
-                                                               window.alarmInterval = null;
-                                                           }
-
-                                                           // Reset mute if it goes stable later
-                                                           setTimeout(() => {
-                                                               const unstableCount = allSegments.filter(s => s.risk_level === 'UNSTABLE').length;
-                                                               if (unstableCount === 0) window.emergencyMuted = false;
-                                                           }, 10000);
-                                                       });
-                                                   }
-
-                                                   // Heavy Storm UI & Canvas Engine
-                                                   let stormRainFrame;
-                                                   let lightningInterval;
-                                                   function toggleStormEffect(active) {
-                                                       const stormCont = document.getElementById('storm-container');
-                                                       const stormRain = document.getElementById('storm-rain-canvas');
-                                                       const stormLig = document.getElementById('storm-lightning');
-                                                       if(!stormCont || !stormRain) return;
-
-                                                       if (active) {
-                                                           stormCont.style.display = 'block';
-                                                           playUIBeep('error'); // simulate siren/alert beep
-
-                                                           // Rain canvas logic
-                                                           const ctx = stormRain.getContext('2d');
-                                                           stormRain.width = window.innerWidth;
-                                                           stormRain.height = window.innerHeight;
-                                                           const raindrops = [];
-                                                           for(let i=0; i<300; i++){
-                                                               raindrops.push({
-                                                                   x: Math.random() * stormRain.width,
-                                                                   y: Math.random() * stormRain.height,
-                                                                   len: Math.random() * 20 + 10,
-                                                                   speed: Math.random() * 15 + 15
-                                                               });
-                                                           }
-
-                                                           function drawRain() {
-                                                               ctx.clearRect(0, 0, stormRain.width, stormRain.height);
-                                                               ctx.strokeStyle = 'rgba(174,194,224,0.6)';
-                                                               ctx.lineWidth = 1;
-                                                               ctx.beginPath();
-                                                               for(let i=0; i<raindrops.length; i++) {
-                                                                   let d = raindrops[i];
-                                                                   ctx.moveTo(d.x, d.y);
-                                                                   ctx.lineTo(d.x - d.len/4, d.y + d.len);
-                                                                   d.y += d.speed;
-                                                                   d.x -= d.speed/4;
-                                                                   if(d.y > stormRain.height) {
-                                                                       d.y = -20;
-                                                                       d.x = Math.random() * stormRain.width + 50;
-                                                                   }
-                                                               }
-                                                               ctx.stroke();
-                                                               stormRainFrame = requestAnimationFrame(drawRain);
-                                                           }
-                                                           drawRain();
-
-                                                           // Lightning logic
-                                                           lightningInterval = setInterval(() => {
-                                                               if(Math.random() > 0.6) {
-                                                                   stormLig.style.animation = 'none';
-                                                                   void stormLig.offsetWidth; // trigger reflow
-                                                                   stormLig.style.animation = 'strobeLightning 0.5s ease-out';
-                                                                   setTimeout(() => playUIBeep('error'), 100);
-                                                               }
-                                                           }, 3000);
-
-                                                       } else {
-                                                           stormCont.style.display = 'none';
-                                                           cancelAnimationFrame(stormRainFrame);
-                                                           clearInterval(lightningInterval);
-                                                           stormLig.style.animation = 'none';
-                                                       }
-                                                   }
+    } else {
+        stormCont.style.display = 'none';
+        if (stormRainFrame) cancelAnimationFrame(stormRainFrame);
+        if (lightningInterval) clearInterval(lightningInterval);
+        if (stormLig) stormLig.style.animation = 'none';
+    }
+}
