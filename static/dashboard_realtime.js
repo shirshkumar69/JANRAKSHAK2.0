@@ -73,6 +73,7 @@
 
         if (data.segments) {
             globalSegments = data.segments;
+            window._globalSegments = globalSegments;
             applyForecastAndRender();
         }
 
@@ -1083,112 +1084,340 @@
         const W = canvas.width;
         const H = canvas.height;
 
-        // Procedural points
-        const points = [];
-        for(let i=0; i<30; i++) {
-            points.push({
-                x: Math.random() * W,
-                y: Math.random() * H,
-                z: Math.random()
+        // ----- PROCEDURAL TERRAIN -----
+        // Mountain ridgeline silhouettes (3 parallax layers)
+        function genRidge(segments, baseY, amp, seed) {
+            const pts = [];
+            for (let i = 0; i <= segments; i++) {
+                const x = (i / segments) * W;
+                const n1 = Math.sin(i * 0.3 + seed) * amp * 0.5;
+                const n2 = Math.sin(i * 0.7 + seed * 1.7) * amp * 0.3;
+                const n3 = Math.sin(i * 1.4 + seed * 0.6) * amp * 0.2;
+                pts.push({ x, y: baseY + n1 + n2 + n3 });
+            }
+            return pts;
+        }
+        const ridgeFar  = genRidge(60, H * 0.32, 55, 1.2);
+        const ridgeMid  = genRidge(60, H * 0.48, 45, 3.7);
+        const ridgeNear = genRidge(60, H * 0.62, 35, 6.1);
+
+        // Road (winding highway through valley)
+        function genRoad(segments, seed) {
+            const pts = [];
+            for (let i = 0; i <= segments; i++) {
+                const t = i / segments;
+                const x = W * 0.25 + Math.sin(t * 4 + seed) * W * 0.15 + Math.sin(t * 7 + seed * 2) * W * 0.06;
+                const y = t * H;
+                pts.push({ x, y });
+            }
+            return pts;
+        }
+        const roadCenter = genRoad(80, 2.3);
+
+        // Debris / rock scatter particles
+        const debris = [];
+        for (let i = 0; i < 40; i++) {
+            debris.push({
+                x: 100 + Math.random() * (W - 200),
+                y: H * 0.35 + Math.random() * (H * 0.55),
+                size: 2 + Math.random() * 6,
+                shade: Math.random()
             });
         }
 
+        // Trees (small triangular shapes on ridges)
+        const trees = [];
+        for (let i = 0; i < 50; i++) {
+            trees.push({
+                x: Math.random() * W,
+                y: H * 0.4 + Math.random() * (H * 0.35),
+                h: 4 + Math.random() * 8,
+                shade: 0.3 + Math.random() * 0.4
+            });
+        }
+
+        // YOLOv8 detection targets with more variety
         const bboxes = [
-            { x: W*0.3, y: H*0.4, w: 120, h: 80, label: "ROCKFALL DEBRIS 94%" },
-            { x: W*0.6, y: H*0.6, w: 90, h: 90, label: "TRAPPED VEHICLE 96%" }
+            { x: W*0.18, y: H*0.52, w: 105, h: 68,  label: "ROCKFALL_DEBRIS",   conf: 94.2, color: [255,71,87]  },
+            { x: W*0.55, y: H*0.68, w: 80,  h: 55,  label: "TRAPPED_VEHICLE",    conf: 96.1, color: [0,217,255]  },
+            { x: W*0.72, y: H*0.38, w: 95,  h: 42,  label: "TENSION_CRACK_0.4M", conf: 88.7, color: [255,165,2]  },
+            { x: W*0.35, y: H*0.78, w: 115, h: 60,  label: "MUDFLOW_INUNDATION", conf: 91.5, color: [255,71,87]  }
         ];
+
+        // Scrolling offset for motion
+        let scrollY = 0;
 
         function draw() {
             const now = Date.now();
             const dt = (now - t) / 1000;
             droneState.time += dt;
             t = now;
+            scrollY += 18 * dt; // slow forward flight crawl
 
-            // Background
-            if(droneState.mode === 'flir') {
-                ctx.fillStyle = '#1e050f'; // Dark purple/ironbow base
+            const isFlir = droneState.mode === 'flir';
+
+            // ===== SKY & GROUND =====
+            if (isFlir) {
+                // FLIR: dark ironbow gradient
+                const skyG = ctx.createLinearGradient(0, 0, 0, H);
+                skyG.addColorStop(0, '#0a0016');
+                skyG.addColorStop(0.3, '#1a0525');
+                skyG.addColorStop(0.5, '#2d0a1a');
+                skyG.addColorStop(1, '#110308');
+                ctx.fillStyle = skyG;
             } else {
-                ctx.fillStyle = '#050a14';
+                // RGB: realistic aerial green/brown terrain
+                const skyG = ctx.createLinearGradient(0, 0, 0, H);
+                skyG.addColorStop(0, '#1a2840');   // hazy sky
+                skyG.addColorStop(0.25, '#2a3d52'); // atmospheric haze
+                skyG.addColorStop(0.4, '#2d4a2a');  // far vegetation
+                skyG.addColorStop(0.6, '#3a5a30');  // mid green canopy
+                skyG.addColorStop(0.8, '#4a3a28');  // exposed soil
+                skyG.addColorStop(1, '#3d3025');    // near ground
+                ctx.fillStyle = skyG;
             }
             ctx.fillRect(0, 0, W, H);
 
-            // Sim motion blur & terrain
-            const speed = 40;
-            ctx.lineWidth = 1;
-
-            if(droneState.mode === 'flir') {
-                ctx.strokeStyle = `rgba(255, 100, 0, 0.4)`;
-                ctx.fillStyle = `rgba(255, 200, 0, 0.2)`;
-            } else {
-                ctx.strokeStyle = `rgba(0, 217, 255, 0.4)`;
-                ctx.fillStyle = `rgba(0, 217, 255, 0.05)`;
+            // ===== MOUNTAIN RIDGELINES =====
+            function drawRidge(pts, fillColor, strokeColor) {
+                ctx.beginPath();
+                ctx.moveTo(0, H);
+                pts.forEach(p => ctx.lineTo(p.x, p.y + Math.sin(scrollY * 0.02 + p.x * 0.01) * 3));
+                ctx.lineTo(W, H);
+                ctx.closePath();
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 1;
+                ctx.stroke();
             }
 
-            points.forEach(p => {
-                p.y += speed * dt;
-                if(p.y > H) p.y = -50;
+            if (isFlir) {
+                drawRidge(ridgeFar,  'rgba(60,10,40,0.5)',  'rgba(180,40,80,0.3)');
+                drawRidge(ridgeMid,  'rgba(80,15,30,0.6)',  'rgba(220,60,40,0.35)');
+                drawRidge(ridgeNear, 'rgba(100,20,15,0.7)', 'rgba(255,80,20,0.4)');
+            } else {
+                drawRidge(ridgeFar,  'rgba(35,55,40,0.6)',  'rgba(60,90,60,0.3)');
+                drawRidge(ridgeMid,  'rgba(45,70,35,0.7)',  'rgba(80,110,60,0.35)');
+                drawRidge(ridgeNear, 'rgba(55,45,30,0.8)',  'rgba(90,70,40,0.4)');
+            }
 
-                // Draw mock topo contours
+            // ===== TREES =====
+            trees.forEach(tr => {
+                const ty = tr.y + Math.sin(scrollY * 0.03 + tr.x * 0.02) * 2;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.z * 40, 0, Math.PI*2);
-                ctx.stroke();
+                ctx.moveTo(tr.x, ty);
+                ctx.lineTo(tr.x - tr.h * 0.4, ty + tr.h);
+                ctx.lineTo(tr.x + tr.h * 0.4, ty + tr.h);
+                ctx.closePath();
+                if (isFlir) {
+                    ctx.fillStyle = `rgba(255, ${100 + tr.shade * 140 | 0}, 0, ${0.25 + tr.shade * 0.15})`;
+                } else {
+                    ctx.fillStyle = `rgba(${30 + tr.shade * 40 | 0}, ${60 + tr.shade * 50 | 0}, ${20 + tr.shade * 20 | 0}, 0.7)`;
+                }
+                ctx.fill();
             });
 
-            // Crosshair (Artificial Horizon)
-            const cx = W/2, cy = H/2;
-            const pitch = Math.sin(droneState.time) * 15;
-            const roll = Math.cos(droneState.time * 0.5) * 5;
+            // ===== ROAD =====
+            ctx.beginPath();
+            roadCenter.forEach((p, i) => {
+                const rx = p.x + Math.sin(scrollY * 0.04 + p.y * 0.01) * 3;
+                if (i === 0) ctx.moveTo(rx, p.y);
+                else ctx.lineTo(rx, p.y);
+            });
+            ctx.strokeStyle = isFlir ? 'rgba(200,180,50,0.5)' : 'rgba(140,130,110,0.6)';
+            ctx.lineWidth = 8;
+            ctx.stroke();
+            // Road dashes
+            ctx.setLineDash([8, 12]);
+            ctx.strokeStyle = isFlir ? 'rgba(255,230,80,0.4)' : 'rgba(220,210,180,0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.setLineDash([]);
 
+            // ===== DEBRIS SCATTER =====
+            debris.forEach(d => {
+                const dy = ((d.y + scrollY * 8) % (H * 0.7)) + H * 0.3;
+                if (isFlir) {
+                    ctx.fillStyle = `rgba(255, ${60 + d.shade * 180 | 0}, ${d.shade * 30 | 0}, ${0.4 + d.shade * 0.3})`;
+                } else {
+                    ctx.fillStyle = `rgba(${80 + d.shade * 60 | 0}, ${65 + d.shade * 40 | 0}, ${50 + d.shade * 30 | 0}, 0.6)`;
+                }
+                ctx.fillRect(d.x, dy, d.size, d.size * 0.7);
+            });
+
+            // ===== CONTOUR LINES (topo) =====
+            ctx.globalAlpha = 0.12;
+            for (let i = 0; i < 8; i++) {
+                const cy2 = H * 0.3 + i * (H * 0.08);
+                ctx.beginPath();
+                for (let x = 0; x < W; x += 3) {
+                    const yy = cy2 + Math.sin(x * 0.02 + i * 1.5 + scrollY * 0.01) * 15;
+                    if (x === 0) ctx.moveTo(x, yy);
+                    else ctx.lineTo(x, yy);
+                }
+                ctx.strokeStyle = isFlir ? '#ff6040' : '#88aa66';
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1.0;
+
+            // ===== YOLOv8 AI BOUNDING BOXES =====
+            const cx = W / 2, cy = H / 2;
+            const pitch = Math.sin(droneState.time * 0.8) * 8;
+            const roll  = Math.cos(droneState.time * 0.4) * 3;
+
+            if (droneState.ai) {
+                const pulse = Math.abs(Math.sin(droneState.time * 3));
+                bboxes.forEach(b => {
+                    const bx = b.x + Math.sin(droneState.time * 1.2 + b.y * 0.01) * 6;
+                    const by = b.y + Math.cos(droneState.time * 0.9 + b.x * 0.01) * 4;
+                    const r = b.color[0], g = b.color[1], bl = b.color[2];
+                    const alpha = 0.5 + pulse * 0.5;
+
+                    // Box border
+                    ctx.strokeStyle = `rgba(${r},${g},${bl},${alpha})`;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(bx, by, b.w, b.h);
+                    // Corner brackets (tactical look)
+                    const L = 10;
+                    ctx.lineWidth = 3;
+                    // top-left
+                    ctx.beginPath(); ctx.moveTo(bx, by + L); ctx.lineTo(bx, by); ctx.lineTo(bx + L, by); ctx.stroke();
+                    // top-right
+                    ctx.beginPath(); ctx.moveTo(bx + b.w - L, by); ctx.lineTo(bx + b.w, by); ctx.lineTo(bx + b.w, by + L); ctx.stroke();
+                    // bot-left
+                    ctx.beginPath(); ctx.moveTo(bx, by + b.h - L); ctx.lineTo(bx, by + b.h); ctx.lineTo(bx + L, by + b.h); ctx.stroke();
+                    // bot-right
+                    ctx.beginPath(); ctx.moveTo(bx + b.w - L, by + b.h); ctx.lineTo(bx + b.w, by + b.h); ctx.lineTo(bx + b.w, by + b.h - L); ctx.stroke();
+
+                    // Label background
+                    const labelTxt = `${b.label}: ${b.conf}%`;
+                    ctx.font = 'bold 10px monospace';
+                    const tw = ctx.measureText(labelTxt).width + 10;
+                    ctx.fillStyle = `rgba(${r},${g},${bl},${0.7 + pulse * 0.3})`;
+                    ctx.fillRect(bx, by - 18, tw, 16);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(labelTxt, bx + 5, by - 5);
+
+                    // Tracking crosshair inside box
+                    const bcx = bx + b.w / 2, bcy = by + b.h / 2;
+                    ctx.strokeStyle = `rgba(${r},${g},${bl},${0.3 + pulse * 0.3})`;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath(); ctx.moveTo(bcx - 15, bcy); ctx.lineTo(bcx + 15, bcy); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(bcx, bcy - 15); ctx.lineTo(bcx, bcy + 15); ctx.stroke();
+                    ctx.setLineDash([]);
+                });
+            }
+
+            // ===== HUD OVERLAY =====
+            // Artificial Horizon Crosshair
             ctx.save();
             ctx.translate(cx, cy + pitch);
             ctx.rotate(roll * Math.PI / 180);
 
-            ctx.strokeStyle = droneState.mode === 'flir' ? '#fffa' : '#0f0a';
-            ctx.lineWidth = 2;
+            const hudColor = isFlir ? 'rgba(255,200,80,0.7)' : 'rgba(0,255,80,0.7)';
+            ctx.strokeStyle = hudColor;
+            ctx.lineWidth = 1.5;
+            // Wings
             ctx.beginPath();
-            ctx.moveTo(-100, 0); ctx.lineTo(-20, 0);
-            ctx.moveTo(100, 0); ctx.lineTo(20, 0);
-            ctx.moveTo(0, -20); ctx.lineTo(0, -50);
-            ctx.moveTo(-60, 20); ctx.lineTo(60, 20);
-            ctx.moveTo(-40, 40); ctx.lineTo(40, 40);
+            ctx.moveTo(-120, 0); ctx.lineTo(-30, 0);
+            ctx.moveTo(120, 0);  ctx.lineTo(30, 0);
             ctx.stroke();
+            // Center dot
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.stroke();
+            // Pitch ladder
+            for (let i = -2; i <= 2; i++) {
+                if (i === 0) continue;
+                const py = i * 25;
+                ctx.beginPath();
+                ctx.moveTo(-40, py); ctx.lineTo(40, py);
+                ctx.stroke();
+                ctx.font = '9px monospace';
+                ctx.fillStyle = hudColor;
+                ctx.fillText((i * 5) + '°', 44, py + 3);
+                ctx.fillText((i * 5) + '°', -58, py + 3);
+            }
             ctx.restore();
 
-            // YOLOv8 Bounding Boxes
-            if(droneState.ai) {
-                const pulse = Math.abs(Math.sin(droneState.time * 4));
-                bboxes.forEach(b => {
-                    const bx = b.x + Math.sin(droneState.time * 2)*10; // drift
-                    const by = b.y + Math.cos(droneState.time * 1.5)*10;
+            // Compass heading bar (top)
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(cx - 120, 8, 240, 20);
+            ctx.strokeStyle = hudColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cx - 120, 8, 240, 20);
+            const headVal = ((42 + roll + droneState.time * 2) % 360).toFixed(0);
+            ctx.fillStyle = hudColor;
+            ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`HDG ${headVal}° | GND SPD 18.4 m/s | WND 12 kt`, cx, 22);
+            ctx.textAlign = 'left';
 
-                    ctx.strokeStyle = `rgba(255, 40, 40, ${0.4 + pulse*0.6})`;
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(bx, by, b.w, b.h);
-
-                    // Label
-                    ctx.fillStyle = `rgba(255, 40, 40, ${0.4 + pulse*0.6})`;
-                    ctx.fillRect(bx, by - 16, b.label.length * 6.5, 16);
-                    ctx.fillStyle = '#fff';
-                    ctx.font = '10px monospace';
-                    ctx.fillText(b.label, bx + 4, by - 4);
-                });
+            // Altitude & speed tape (left side)
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillRect(8, cy - 60, 55, 120);
+            ctx.strokeStyle = hudColor;
+            ctx.strokeRect(8, cy - 60, 55, 120);
+            ctx.fillStyle = hudColor;
+            ctx.font = '9px monospace';
+            const altBase = 182 + pitch;
+            for (let i = -3; i <= 3; i++) {
+                const ay = cy + i * 18;
+                ctx.fillText((altBase - i * 10).toFixed(0) + 'm', 14, ay + 3);
+                ctx.beginPath(); ctx.moveTo(55, ay); ctx.lineTo(63, ay); ctx.stroke();
             }
+            ctx.font = 'bold 10px monospace';
+            ctx.fillStyle = '#000';
+            ctx.fillRect(8, cy - 8, 55, 16);
+            ctx.fillStyle = hudColor;
+            ctx.fillText(altBase.toFixed(1) + 'm', 12, cy + 4);
 
-            // Vignette & Scanlines
-            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, W);
-            grad.addColorStop(0, 'transparent');
-            grad.addColorStop(1, 'rgba(0,0,0,0.8)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0,0,W,H);
+            // Bottom status bar
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, H - 28, W, 28);
+            ctx.fillStyle = hudColor;
+            ctx.font = '10px monospace';
+            const coord = '30.3352°N  79.0624°E';
+            const utc = new Date().toISOString().slice(11, 19) + ' UTC';
+            ctx.fillText(`GPS: ${coord}  |  HDOP: 0.8  |  ${utc}  |  GIMBAL: -45.2°  |  SENSOR: ${isFlir ? 'FLIR LWIR' : 'OPTICAL RGB'}`, 12, H - 10);
 
-            for(let y=0; y<H; y+=4) {
-                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            // ===== SCANLINES (subtle) =====
+            ctx.globalAlpha = 0.06;
+            for (let y = 0; y < H; y += 3) {
+                ctx.fillStyle = '#000';
                 ctx.fillRect(0, y, W, 1);
             }
+            ctx.globalAlpha = 1.0;
 
-            // HUD UI texts
-            document.getElementById('drone-alt') && (document.getElementById('drone-alt').textContent = (180 + pitch).toFixed(1) + ' m');
-            document.getElementById('drone-heading') && (document.getElementById('drone-heading').textContent = (42 + roll).toFixed(1) + '° NE');
+            // ===== VIGNETTE =====
+            const vig = ctx.createRadialGradient(cx, cy, W * 0.2, cx, cy, W * 0.65);
+            vig.addColorStop(0, 'transparent');
+            vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+            ctx.fillStyle = vig;
+            ctx.fillRect(0, 0, W, H);
+
+            // ===== REC indicator =====
+            const recPulse = Math.sin(droneState.time * 3) > 0;
+            if (recPulse) {
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(W - 30, 20, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText('REC', W - 55, 24);
+
+            // ===== UPDATE DOM TELEMETRY =====
+            const altEl = document.getElementById('drone-alt');
+            const hdgEl = document.getElementById('drone-heading');
+            const latEl = document.getElementById('drone-latency');
+            if (altEl) altEl.textContent = altBase.toFixed(1) + ' m';
+            if (hdgEl) hdgEl.textContent = headVal + '° NE';
+            if (latEl) latEl.textContent = (10.5 + Math.sin(droneState.time) * 2.5).toFixed(1) + 'ms';
 
             droneLoopId = requestAnimationFrame(draw);
         }
