@@ -310,7 +310,7 @@ Returns server uptime, telemetry cache status, background worker health, and act
 
 JANRAKSHAK is architected to operate with **zero API keys** and **zero paid dependencies**:
 
-- **Cartography & Tiles**: OpenTopoMap, CartoDB Dark Matter, and OpenStreetMap.
+- **Cartography & Tiles**: Esri World Imagery, Esri Dark Gray Canvas, Esri World Topo Map (100% Free / Keyless).
 - **Meteorological Data**: Open-Meteo Non-Commercial Global Forecast & Historical APIs.
 - **Doppler Radar Tiles**: RainViewer Global Weather Radar Tile Cache API.
 - **Elevation Data**: NASA SRTM 30m 1-arc-second Digital Elevation Model via Open-Meteo.

@@ -815,10 +815,10 @@
                 attributionControl: false
             }).setView([22.5, 80.0], 5); // Focused on India
 
-            // CartoDB Dark Matter Keyless Layer
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            // Ultra-Reliable 100% Keyless Esri Dark Gray GIS Layer
+            L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 18,
-                subdomains: 'abcd'
+                attribution: '© Esri, HERE, Garmin, © OpenStreetMap contributors'
             }).addTo(radarMap);
 
             // Click anywhere on map to inspect weather & landslide risk
@@ -848,21 +848,21 @@
                 const nowcastFrames = data.radar.nowcast || [];
                 const allFrames = [...pastFrames, ...nowcastFrames];
 
+                if (allFrames.length === 0) return;
+
                 radarTimestamps = allFrames.map(f => f.time);
-
-                if (radarTimestamps.length === 0) return;
-
                 const host = data.host || 'https://tilecache.rainviewer.com';
                 const slider = document.getElementById('radar-timeline');
-                slider.max = radarTimestamps.length - 1;
-                slider.value = radarTimestamps.length - 1;
-                currentFrameIndex = radarTimestamps.length - 1;
+                slider.max = allFrames.length - 1;
+                slider.value = allFrames.length - 1;
+                currentFrameIndex = allFrames.length - 1;
 
-                // Create TileLayers for each timestamp frame
-                radarLayers = radarTimestamps.map((ts, idx) => {
-                    const url = `${host}/v2/radar/${ts}/256/{z}/{x}/{y}/${radarColorScheme}/1_1.png`;
+                // Create TileLayers for each timestamp frame using public path format
+                radarLayers = allFrames.map((frame, idx) => {
+                    const tilePath = frame.path ? frame.path : `/v2/radar/${frame.time}`;
+                    const url = `${host}${tilePath}/256/{z}/{x}/{y}/${radarColorScheme}/1_1.png`;
                     return L.tileLayer(url, {
-                        opacity: idx === currentFrameIndex ? 0.8 : 0,
+                        opacity: idx === currentFrameIndex ? 0.85 : 0,
                         zIndex: 100 + idx
                     });
                 });

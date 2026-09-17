@@ -725,9 +725,10 @@
                 attributionControl: false
             }).setView([30.28, 79.15], 8);
 
-            // OpenTopoMap & CartoDB Dark Matter
-            L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 17
+            // Esri World Topo Map (100% Guaranteed Keyless)
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri, USGS, FAO, NOAA',
+                maxZoom: 18
             }).addTo(gisMap);
 
             // Click anywhere on Earth to get real elevation & geotechnical analysis

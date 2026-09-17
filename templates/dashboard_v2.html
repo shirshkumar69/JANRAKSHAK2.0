@@ -1098,6 +1098,11 @@
             50% { opacity: 0.55; transform: scale(0.96); }
         }
 
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         /* Responsive */
         @media (max-width: 1100px) {
             .hazard-split-grid,
@@ -1210,7 +1215,18 @@
                             Command Center
                             <span class="mode-pill" id="system-mode-badge">Live Telemetry</span>
                         </h1>
-                        <p>NH-07 Rishikesh–Badrinath Corridor · 12 Monitored High-Risk Sectors</p>
+                        <p>
+                            <!-- Corridor Selector -->
+                            <select id="corridor-selector" class="corridor-selector-dropdown" style="background: var(--dark-lighter); border: 1px solid var(--border); color: var(--text-primary); padding: 5px 10px; border-radius: 6px; font-size: 13px; outline: none; font-family: 'Space Grotesk', sans-serif;">
+                                <option value="NH-07">NH-07: Uttarakhand Himalayas</option>
+                                <option value="NH-66">NH-66: Western Ghats</option>
+                                <option value="NH-10">NH-10: Sikkim Himalayas</option>
+                                <option value="NH-44">NH-44: Pir Panjal (J&K)</option>
+                                <option value="NH-03">NH-03: Beas Valley (HP)</option>
+                                <option value="NH-516E">NH-516E: Eastern Ghats</option>
+                            </select>
+                            · 12 Monitored High-Risk Sectors
+                        </p>
                     </div>
                     <div class="header-actions">
                         <button class="btn" id="btn-refresh" onclick="window.JANRAKSHAK_RT && window.JANRAKSHAK_RT.requestUpdate()">
@@ -1423,6 +1439,25 @@
                                 <span>Stable (FoS &gt; 1.35)</span>
                             </div>
                         </div>
+
+                        <!-- 72H Timeline Scrubber HUD -->
+                        <div id="timeline-hud" class="timeline-hud-container glass-panel" style="position:absolute; bottom:16px; right:16px; background:rgba(10,14,26,0.92); backdrop-filter:blur(12px); border:1px solid var(--border); padding:16px; border-radius:var(--radius-sm); z-index:1000; width:340px;">
+                            <div class="timeline-hud-header" style="margin-bottom:12px; font-size:10px; color:var(--text-muted); font-weight:600; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
+                                <span class="tag" style="background:var(--primary); color:var(--dark); padding:2px 6px; border-radius:4px; font-weight:bold;">●</span>
+                                <span>72-HOUR CYBERNETIC FORECAST SCRUBBER</span>
+                            </div>
+                            <div class="timeline-hud-controls" style="display:flex; align-items:center; gap:12px;">
+                                <button id="scrubber-play-btn" class="hud-btn" title="Play 72h Forecast" style="background:var(--dark-lighter); border:1px solid var(--border); width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--primary); transition:all 0.2s ease;">
+                                    <span class="nav-icon" style="font-size:12px; margin-left:2px;">▶</span>
+                                </button>
+                                <input type="range" id="forecast-scrubber" class="timeline-slider calc-range" min="0" max="72" value="0" step="6" style="flex:1;">
+                                <span id="forecast-time-readout" class="hud-time-readout" style="font-family:'DM Mono', monospace; font-size:11px; color:var(--primary); font-weight:600; white-space:nowrap;">T+0H (CURRENT)</span>
+                            </div>
+                            <div class="timeline-metrics" style="display:flex; justify-content:space-between; font-size:9px; color:var(--text-secondary); margin-top:8px;">
+                                <span>Forecast Window: 72 Hours</span>
+                                <span>Transient Infiltration Model Active</span>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -1599,24 +1634,147 @@
         </main>
     </div>
 
+    <!-- IoT Telemetry Modal (#iot-modal) -->
+    <div id="iot-modal" class="modal-overlay hidden" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
+        <div class="modal-content glass-panel" style="background:rgba(10, 14, 28, 0.95); border:1px solid var(--border); width:90%; max-width:600px; padding:24px; border-radius:8px; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);">
+            <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:12px; margin-bottom:16px;">
+                <div>
+                    <span class="tag" style="font-size:10px; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase;">RAW DATA STREAM</span>
+                    <h2 style="font-size:18px; margin-top:4px;">IoT Telemetry Inspector</h2>
+                </div>
+                <button class="close-modal" id="close-telemetry" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;" onclick="document.getElementById('iot-modal').style.display='none';">&times;</button>
+            </div>
+            <div style="padding: 12px; color: var(--text-secondary); font-family: 'DM Mono', monospace; font-size: 11px; white-space: pre-wrap; background:#05070d; border-radius:4px; height:200px; overflow-y:auto;" id="telemetry-output">
+establishing secure link to Open-Meteo...
+fetching spatial tensors...
+            </div>
+        </div>
+    </div>
+
+    <!-- TACTICAL EMERGENCY DISPATCH MODAL -->
+    <div id="dispatch-modal" class="modal hidden" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:rgba(10, 14, 28, 0.95); border:1px solid #ff3344; width:90%; max-width:800px; padding:30px; border-radius:8px; box-shadow:0 0 40px rgba(255, 51, 68, 0.2);">
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:15px; margin-bottom:20px;">
+                <h2 style="color:#ff3344; margin:0; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:24px;">🚨</span> TACTICAL EMERGENCY DISPATCH AUTHORIZATION
+                </h2>
+                <button id="close-dispatch" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;" onclick="document.getElementById('dispatch-modal').style.display='none';">&times;</button>
+            </div>
+
+            <p style="color:#a8b2c1; font-size:14px; margin-bottom:20px;">
+                WARNING: Authorizing dispatch will issue immediate stop-work and evacuation orders via API to BRO, NHAI, District Administration, and NDRF integrated portals for the targeted sectors.
+            </p>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:30px;">
+                <div style="background:rgba(255, 255, 255, 0.05); padding:15px; border-left:3px solid #ffaa00; font-family:'DM Mono', monospace; font-size:12px; color:#ddd;">
+                    <strong style="color:#ffaa00">TARGETED UNSTABLE SECTORS:</strong>
+                    <ul id="dispatch-targets" style="padding-left:15px; margin-top:10px; line-height:1.6;">
+                        <li>NO CRITICAL SECTORS DETECTED</li>
+                    </ul>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:#ddd;"><input type="checkbox" checked> NHAI & BRO Traffic Stopper Activation</label>
+                    <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:#ddd;"><input type="checkbox" checked> District Admin (DM) Evacuation Sirens</label>
+                    <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:#ddd;"><input type="checkbox" checked> NDRF / SDRF Mobilization Request</label>
+                    <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:#ddd;"><input type="checkbox" checked> SMS Broadcast (Towers in 5km radius)</label>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:15px; justify-content:flex-end;">
+                <button id="print-bulletin-btn" style="background:transparent; border:1px solid #00f2fe; color:#00f2fe; padding:12px 24px; cursor:pointer; font-weight:bold; font-family:'DM Mono', monospace; border-radius:4px;" onclick="window.print();">
+                    🖨️ PRINT ADVISORY BULLETIN
+                </button>
+                <button id="authorize-dispatch-btn" style="background:#ff3344; border:none; color:white; padding:12px 24px; cursor:pointer; font-weight:bold; font-family:'DM Mono', monospace; border-radius:4px; box-shadow:0 0 15px rgba(255,51,68,0.4);">
+                    CONFIRM DISPATCH & TRANSMIT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRINTABLE MILITARY-GRADE ADVISORY BULLETIN (Visible only in @media print) -->
+    <div id="printable-bulletin" style="display:none;">
+        <style>
+            @media print {
+                body * { display: none !important; }
+                #printable-bulletin, #printable-bulletin * { display: block !important; }
+                #printable-bulletin { position: absolute; left: 0; top: 0; width: 100%; color: black; background: white; padding: 20px; }
+            }
+        </style>
+        <div style="text-align:center; margin-bottom:30px; border-bottom:4px solid #000; padding-bottom:10px;">
+            <h1 style="font-size:24pt; margin:0;">GOVERNMENT OF INDIA</h1>
+            <h2 style="font-size:16pt; margin:5px 0;">NATIONAL & STATE DISASTER MANAGEMENT AUTHORITY</h2>
+            <h3 style="font-size:14pt; margin:0; color:#b30000; text-transform:uppercase;">IMMEDIATE ADVISORY BULLETIN - LANDSLIDE HAZARD</h3>
+        </div>
+
+        <table style="width:100%; font-size:12pt; margin-bottom:30px;">
+            <tr>
+                <td><strong>DATE ISSUED:</strong> <span id="print-date">---</span></td>
+                <td style="text-align:right;"><strong>BULLETIN ID:</strong> JNK-WARN-<span id="print-id">---</span></td>
+            </tr>
+            <tr>
+                <td><strong>CORRIDOR:</strong> <span id="print-corridor">---</span></td>
+                <td style="text-align:right;"><strong>AFFECTED TIER:</strong> RED (UNSTABLE)</td>
+            </tr>
+        </table>
+
+        <p style="font-size:12pt; text-align:justify; margin-bottom:20px;">
+            Based on the JANRAKSHAK SatCom & IoT telemetry network, utilizing real-time
+            transient infiltration modelling and live USGS seismic coupling, the following sectors
+            have crossed critical Factor of Safety (FoS) thresholds indicating IMMINENT FAILURE.
+        </p>
+
+        <table style="width:100%; border-collapse:collapse; margin-bottom:40px; font-size:11pt;">
+            <thead>
+                <tr style="background:#ddd; border-bottom:2px solid #000;">
+                    <th style="padding:8px; text-align:left; border:1px solid #000;">Sector ID</th>
+                    <th style="padding:8px; text-align:left; border:1px solid #000;">Name (Chainage)</th>
+                    <th style="padding:8px; text-align:center; border:1px solid #000;">Factor of Safety</th>
+                    <th style="padding:8px; text-align:center; border:1px solid #000;">Rainfall (24h)</th>
+                    <th style="padding:8px; text-align:left; border:1px solid #000;">Risk Level</th>
+                </tr>
+            </thead>
+            <tbody id="print-targets-table">
+                <!-- Injected rows -->
+            </tbody>
+        </table>
+
+        <div style="font-size:11pt; border:2px solid #000; padding:15px; margin-bottom:40px; background:#f9f9f9;">
+            <strong>MANDATORY DIRECTIVES:</strong>
+            <ol style="margin-top:10px;">
+                <li>Immediate halt of all traffic movement through the affected sectors.</li>
+                <li>Activate identified regional detour & bypass routes using Traffic Police coordinates.</li>
+                <li>Mobilize closest available SDRF/NDRF search and rescue battalions to holding points.</li>
+            </ol>
+        </div>
+
+        <table style="width:100%; margin-top:80px; text-align:center;">
+            <tr>
+                <td style="border-top:1px solid #000; padding-top:10px; width:30%;">Authorized By</td>
+                <td style="width:40%;"></td>
+                <td style="border-top:1px solid #000; padding-top:10px; width:30%;">Receiving Officer Seal</td>
+            </tr>
+        </table>
+    </div>
+
     <!-- Real-time WebSockets & Client Orchestration -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="/static/dashboard_realtime.js"></script>
 
     <script>
-        // Keyless Tile Layers
+        // 100% Guaranteed Keyless GIS Tile Layers (Zero API Keys Needed)
         const tileLayers = {
-            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '©OpenStreetMap, ©CartoDB',
-                maxZoom: 19
+            dark: L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri, HERE, Garmin, © OpenStreetMap contributors',
+                maxZoom: 18
             }),
             sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: '©Esri, Maxar, Earthstar Geographics',
+                attribution: '© Esri, Maxar, Earthstar Geographics',
                 maxZoom: 19
             }),
-            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                attribution: '©OpenStreetMap, ©OpenTopoMap',
-                maxZoom: 17
+            topo: L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri, USGS, FAO, NOAA',
+                maxZoom: 18
             })
         };
 
@@ -1633,7 +1791,9 @@
                 Object.values(tileLayers).forEach(layer => {
                     if (map.hasLayer(layer)) map.removeLayer(layer);
                 });
-                tileLayers[style].addTo(map);
+                if (tileLayers[style]) {
+                    tileLayers[style].addTo(map);
+                }
             }
         }
 

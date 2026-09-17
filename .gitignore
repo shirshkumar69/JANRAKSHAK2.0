@@ -14,3 +14,19 @@ __pycache__/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Temporary & Scratch scripts
+*.bak
+*_backup.*
+*_old_reference.*
+app_temp*.py
+app_fixed.py
+app_py_physics.py
+builder*.py
+patch*.py
+patcher*.py
+make_app*.py
+old_*.py
+fix_app.py
+run_patch.py
+append_endpoints.py
