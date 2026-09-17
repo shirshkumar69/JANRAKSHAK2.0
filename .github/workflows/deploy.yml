@@ -131,7 +131,7 @@ jobs:
         run: |
           echo "🚀 JANRAKSHAK deployment package ready"
           echo "Files included:"
-          ls -la app.py templates/index.html requirements.txt
+          ls -la app.py templates/dashboard_v2.html requirements.txt
           echo ""
           echo "To deploy: gunicorn app:app --bind 0.0.0.0:$PORT"
 

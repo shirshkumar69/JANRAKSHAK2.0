@@ -323,6 +323,10 @@ def compute_fos_pseudostatic(slope_rad, soil, pore_pressure_ratio, kh=0.0):
     fos = resisting / driving if driving > 0 else 50.0
     return max(0.01, fos)
 
+def compute_fos_infinite_slope(slope_rad, soil, pore_pressure_ratio, kh=0.0):
+    """Alias for compute_fos_pseudostatic for backward compatibility."""
+    return compute_fos_pseudostatic(slope_rad, soil, pore_pressure_ratio, kh=kh)
+
 def compute_hybrid_failure_prob(fos, m, slope_rad, phi_deg, kh=0.0, rain_72h=0.0):
     """
     Calibrated Logistic Failure Probability surrogate model (0% to 100%).
@@ -874,6 +878,12 @@ def background_worker():
                 pass
         except Exception:
             pass
+
+# Perform initial telemetry computation on startup
+try:
+    update_system_data()
+except Exception as e:
+    print(f"Initial update_system_data error: {e}")
 
 bg_thread = threading.Thread(target=background_worker, daemon=True)
 bg_thread.start()
