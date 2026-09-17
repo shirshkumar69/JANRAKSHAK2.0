@@ -904,6 +904,297 @@
         window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
 
+// ----------------------------------------------------
+    // AI TACTICAL SITREP & DRONE RECON CONTROLLERS
+    // ----------------------------------------------------
+    let currentSitrepText = "";
+
+    window.openSitrepModal = function() {
+        const modal = document.getElementById('sitrep-modal');
+        if(!modal) return;
+
+        // Populate sectors dropdown
+        const select = document.getElementById('sitrep-sector-select');
+        if(select && window._globalSegments) {
+            select.innerHTML = '<option value="">-- Select Target Sector --</option>';
+            window._globalSegments.forEach(s => {
+                const r = s.rendered_risk || s.risk_level;
+                const ico = r === 'UNSTABLE' ? '🔴' : (r === 'MARGINAL' ? '🟡' : '🟢');
+                select.innerHTML += `<option value="${s.id}">${ico} ${s.id} - ${s.name}</option>`;
+            });
+        }
+
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.remove('hidden'), 50);
+    };
+
+    window.closeSitrepModal = function() {
+        const modal = document.getElementById('sitrep-modal');
+        if(modal) {
+            modal.classList.add('hidden');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    };
+
+    window.generateSitrepReport = async function() {
+        const select = document.getElementById('sitrep-sector-select');
+        const container = document.getElementById('sitrep-output-container');
+        const loader = document.getElementById('sitrep-loading');
+
+        if(!select || !select.value) {
+            alert('Please select a sector from the deployment grid.');
+            return;
+        }
+
+        const sector = window._globalSegments.find(s => s.id === select.value);
+        if(!sector) return;
+
+        container.style.display = 'none';
+        loader.style.display = 'block';
+
+        const payload = {
+            sector_id: sector.id,
+            fos: sector.rendered_fos !== undefined ? sector.rendered_fos : sector.fos.min,
+            rain_24h: sector.rendered_rain !== undefined ? sector.rendered_rain : sector.rainfall.accum_24h_mm,
+            slope_angle: 42.5, // Default/Sim
+            seismic_pga: (window._currentSimConfig && window._currentSimConfig.kh) ? window._currentSimConfig.kh : 0.05,
+            soil_type: sector.geotech.lithology_id || "Fractured Rock"
+        };
+
+        try {
+            const resp = await fetch('/api/ai/sitrep', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+
+            if(data.success) {
+                currentSitrepText = data.sitrep;
+                container.textContent = data.sitrep;
+            } else {
+                container.textContent = "Error generating SITREP: " + (data.error || "Unknown error");
+            }
+        } catch(err) {
+            container.textContent = "CONNECTION ERROR: Failed to reach AI Reasoning Engine.";
+        }
+
+        loader.style.display = 'none';
+        container.style.display = 'block';
+    };
+
+    window.copySitrepToClipboard = function() {
+        if(!currentSitrepText) return;
+        navigator.clipboard.writeText(currentSitrepText).then(() => {
+            alert("📋 SITREP Copied to Clipboard!");
+        });
+    };
+
+    window.toggleSitrepVoice = function() {
+        if (!('speechSynthesis' in window) || !currentSitrepText) return;
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            return;
+        }
+
+        // Strip emoji and markdown for voice
+        const cleanText = currentSitrepText.replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+        const utterance = new SpeechSynthesisUtterance("Geotechnical situation report. " + cleanText);
+        utterance.rate = 1.05;
+
+        let voices = window.speechSynthesis.getVoices();
+        let engVoices = voices.filter(v => v.lang && v.lang.includes('en'));
+        if (engVoices.length > 0) utterance.voice = engVoices[0];
+
+        window.speechSynthesis.speak(utterance);
+    };
+
+    // --- DRONE RECON SYSTEM ---
+    let droneLoopId = null;
+    let droneState = { mode: 'rgb', ai: true, time: 0 };
+
+    window.openDroneModal = function() {
+        const modal = document.getElementById('drone-modal');
+        if(!modal) return;
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.remove('hidden'), 50);
+
+        // Start Canvas Engine
+        const canvas = document.getElementById('drone-canvas');
+        if(canvas) {
+            const ctx = canvas.getContext('2d');
+            cancelAnimationFrame(droneLoopId);
+            runDroneSim(canvas, ctx);
+        }
+    };
+
+    window.closeDroneModal = function() {
+        const modal = document.getElementById('drone-modal');
+        if(modal) {
+            modal.classList.add('hidden');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+        cancelAnimationFrame(droneLoopId);
+    };
+
+    window.setDroneSensor = function(mode) {
+        droneState.mode = mode;
+        const rgbBtn = document.getElementById('drone-sensor-rgb');
+        const flirBtn = document.getElementById('drone-sensor-flir');
+
+        if(mode === 'rgb') {
+            rgbBtn.style.background = 'rgba(0,217,255,0.2)';
+            rgbBtn.style.color = '#00d9ff';
+            flirBtn.style.background = 'rgba(255,255,255,0.05)';
+            flirBtn.style.color = '';
+        } else {
+            rgbBtn.style.background = 'rgba(255,255,255,0.05)';
+            rgbBtn.style.color = '';
+            flirBtn.style.background = 'rgba(255,165,2,0.2)';
+            flirBtn.style.color = '#ffa502';
+        }
+    };
+
+    window.toggleDroneAI = function() {
+        droneState.ai = !droneState.ai;
+        const btn = document.getElementById('drone-ai-toggle');
+        const list = document.getElementById('drone-detections-list');
+
+        if(droneState.ai) {
+            btn.style.background = 'rgba(46,213,115,0.2)';
+            btn.style.color = '#2ed573';
+            btn.innerHTML = '<span>🎯</span> YOLOv8 AI: ON';
+            if(list) list.style.opacity = '1';
+        } else {
+            btn.style.background = 'rgba(255,71,87,0.2)';
+            btn.style.color = '#ff4757';
+            btn.innerHTML = '<span>🎯</span> YOLOv8 AI: OFF';
+            if(list) list.style.opacity = '0.3';
+        }
+    };
+
+    window.transmitDroneGeoTag = function() {
+        alert("🚨 ENCRYPTED DATALINK ENGAGED: Transmitting coordinates to BRO Forward Operating Base...");
+    };
+
+    function runDroneSim(canvas, ctx) {
+        let t = Date.now();
+        const W = canvas.width;
+        const H = canvas.height;
+
+        // Procedural points
+        const points = [];
+        for(let i=0; i<30; i++) {
+            points.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                z: Math.random()
+            });
+        }
+
+        const bboxes = [
+            { x: W*0.3, y: H*0.4, w: 120, h: 80, label: "ROCKFALL DEBRIS 94%" },
+            { x: W*0.6, y: H*0.6, w: 90, h: 90, label: "TRAPPED VEHICLE 96%" }
+        ];
+
+        function draw() {
+            const now = Date.now();
+            const dt = (now - t) / 1000;
+            droneState.time += dt;
+            t = now;
+
+            // Background
+            if(droneState.mode === 'flir') {
+                ctx.fillStyle = '#1e050f'; // Dark purple/ironbow base
+            } else {
+                ctx.fillStyle = '#050a14';
+            }
+            ctx.fillRect(0, 0, W, H);
+
+            // Sim motion blur & terrain
+            const speed = 40;
+            ctx.lineWidth = 1;
+
+            if(droneState.mode === 'flir') {
+                ctx.strokeStyle = `rgba(255, 100, 0, 0.4)`;
+                ctx.fillStyle = `rgba(255, 200, 0, 0.2)`;
+            } else {
+                ctx.strokeStyle = `rgba(0, 217, 255, 0.4)`;
+                ctx.fillStyle = `rgba(0, 217, 255, 0.05)`;
+            }
+
+            points.forEach(p => {
+                p.y += speed * dt;
+                if(p.y > H) p.y = -50;
+
+                // Draw mock topo contours
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.z * 40, 0, Math.PI*2);
+                ctx.stroke();
+            });
+
+            // Crosshair (Artificial Horizon)
+            const cx = W/2, cy = H/2;
+            const pitch = Math.sin(droneState.time) * 15;
+            const roll = Math.cos(droneState.time * 0.5) * 5;
+
+            ctx.save();
+            ctx.translate(cx, cy + pitch);
+            ctx.rotate(roll * Math.PI / 180);
+
+            ctx.strokeStyle = droneState.mode === 'flir' ? '#fffa' : '#0f0a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-100, 0); ctx.lineTo(-20, 0);
+            ctx.moveTo(100, 0); ctx.lineTo(20, 0);
+            ctx.moveTo(0, -20); ctx.lineTo(0, -50);
+            ctx.moveTo(-60, 20); ctx.lineTo(60, 20);
+            ctx.moveTo(-40, 40); ctx.lineTo(40, 40);
+            ctx.stroke();
+            ctx.restore();
+
+            // YOLOv8 Bounding Boxes
+            if(droneState.ai) {
+                const pulse = Math.abs(Math.sin(droneState.time * 4));
+                bboxes.forEach(b => {
+                    const bx = b.x + Math.sin(droneState.time * 2)*10; // drift
+                    const by = b.y + Math.cos(droneState.time * 1.5)*10;
+
+                    ctx.strokeStyle = `rgba(255, 40, 40, ${0.4 + pulse*0.6})`;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(bx, by, b.w, b.h);
+
+                    // Label
+                    ctx.fillStyle = `rgba(255, 40, 40, ${0.4 + pulse*0.6})`;
+                    ctx.fillRect(bx, by - 16, b.label.length * 6.5, 16);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '10px monospace';
+                    ctx.fillText(b.label, bx + 4, by - 4);
+                });
+            }
+
+            // Vignette & Scanlines
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, W);
+            grad.addColorStop(0, 'transparent');
+            grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,W,H);
+
+            for(let y=0; y<H; y+=4) {
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(0, y, W, 1);
+            }
+
+            // HUD UI texts
+            document.getElementById('drone-alt') && (document.getElementById('drone-alt').textContent = (180 + pitch).toFixed(1) + ' m');
+            document.getElementById('drone-heading') && (document.getElementById('drone-heading').textContent = (42 + roll).toFixed(1) + '° NE');
+
+            droneLoopId = requestAnimationFrame(draw);
+        }
+        draw();
+    }
+
     // Public API
     window.JANRAKSHAK_RT = {
         requestUpdate: () => socket && socket.emit('request_update'),

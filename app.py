@@ -956,6 +956,94 @@ def settings_page():
 
 # --- API Endpoints ---
 
+
+@app.route('/api/ai/sitrep', methods=['POST'])
+def generate_sitrep():
+    data = request.json or {}
+    sector_id = data.get('sector_id', 'UNKNOWN-SECTOR')
+    fos = float(data.get('fos', 0.95))
+    rain_24h = float(data.get('rain_24h', 45.0))
+    slope_angle = float(data.get('slope_angle', 45.0))
+    seismic_pga = float(data.get('seismic_pga', 0.0))
+    soil_type = data.get('soil_type', 'Colluvial Soil')
+    
+    # Determine Threat Level
+    threat_level = "🔴 CRITICAL HIGH ALERT" if fos < 1.0 else ("🟡 ELEVATED SURVEILLANCE" if fos < 1.3 else "🟢 SECURE / NOMINAL")
+    
+    # Determine Kinematics
+    kinematics = "Deep-Seated Rotational Landslide" if slope_angle < 35 else "Shallow Debris Flow / Planar Slide"
+    if seismic_pga > 0.1: kinematics = "Seismically-Induced Liquefaction / Rockfall"
+    
+    # Check for ANTHROPIC_API_KEY
+    import os
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    ai_generated = False
+    sitrep_content = ""
+    
+    if anthropic_key:
+        try:
+            import requests
+            headers = {
+                "x-api-key": anthropic_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            }
+            payload = {
+                "model": "claude-3-haiku-20240307",
+                "max_tokens": 800,
+                "system": "You are a senior Geotechnical Military Engineer for the Border Roads Organisation (BRO). Generate a highly structured, tactical Situation Report (SITREP) based on the telemetry provided.",
+                "messages": [
+                    {"role": "user", "content": f"Generate a tactical SITREP for Sector {sector_id}. Telemetry: FoS: {fos}, Rainfall (24h): {rain_24h}mm, Slope Angle: {slope_angle} deg, Seismic PGA: {seismic_pga}g, Soil Type: {soil_type}. Structure it with headers: EXECUTIVE THREAT ASSESSMENT, GEOMECHANICAL METRICS, DEPLOYMENT ORDERS, EVACUATION PROTOCOLS, MITIGATION PLAN. Keep it intense, professional and actionable."}
+                ]
+            }
+            resp = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload, timeout=8)
+            if resp.status_code == 200:
+                sitrep_content = resp.json()['content'][0]['text']
+                ai_generated = True
+        except Exception as e:
+            print(f"LLM API Error: {e}")
+            
+    if not ai_generated:
+        # Fallback Deterministic Generation
+        sitrep_content = f"""== GEOTECHNICAL SITUATION REPORT (SITREP) ==
+SECTOR IDENTIFIER: {sector_id}
+TIMESTAMP: {datetime.now().isoformat()}
+
+🔴 EXECUTIVE THREAT ASSESSMENT & KINEMATICS
+- CURRENT THREAT STATUS: {threat_level}
+- PRIMARY FAILURE MODE: {kinematics}
+- FACTOR OF SAFETY (FoS): {fos:.3f} (CRITICAL < 1.00)
+- IMMEDIATE IMPACT PROBABILITY: {"IMMINENT (98%)" if fos < 1.0 else "MODERATE (45%)"}
+
+📊 GEOMECHANICAL PARAMETER METRICS
+- SLOPE INCLINATION: {slope_angle:.1f}°
+- LITHOLOGICAL PROFILE: {soil_type}
+- ANTECEDENT SATURATION (24H PRECIP): {rain_24h:.1f} mm
+- PSEUDO-STATIC INERTIAL ACCELERATION (k_h): {seismic_pga:.3f} g
+
+🚜 TACTICAL MACHINE & SQUAD DEPLOYMENT ORDERS
+- {"IMMEDIATE DEPLOYMENT of 2x Heavy Excavators (PC-200) & 4x Tipper Trucks to toe of slope." if fos < 1.0 else "Standby Earthmoving machinery at nearest forward operating base."}
+- {"Dispatch NDRF Mountain Rescue & Geo-Engineers for urgent slope profiling." if fos < 1.0 else "Routine BRO patrol sweeps every 4 hours."}
+
+🔄 TRAFFIC & REGIONAL EVACUATION PROTOCOLS
+- {"RED ALERT: Initiate total corridor shutdown. Erect physical barricades 2km from impact zone." if fos < 1.0 else "YELLOW ALERT: Enforce strict speed limits (20 km/h). No heavy hauling."}
+- {"Commence mandatory evacuation of downslope settlements." if rain_24h > 100 or fos < 1.0 else "Issue advisory warning to local transit authorities."}
+
+🏗️ STRUCTURAL MITIGATION & STABILIZATION PLAN
+- Stage 1: Implement urgent slope re-profiling to reduce gradient by 5°.
+- Stage 2: Install horizontal weeping drains to rapidly relieve pore-water pressure (u).
+- Stage 3: {"Execute emergent soil nailing and high-tensile wire mesh netting." if slope_angle > 40 else "Construct Gabion retaining buttress at toe."}
+
+== END OF REPORT ==
+"""
+    return jsonify({
+        "success": True, 
+        "sector_id": sector_id,
+        "sitrep": sitrep_content,
+        "ai_powered": ai_generated
+    })
+
+
 @app.route('/api/health')
 def health():
     return jsonify({

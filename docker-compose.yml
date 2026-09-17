@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  janrakshak-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: janrakshak:latest
+    container_name: janrakshak-server
+    ports:
+      - "5555:5555"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      # Provide your Anthropic / OpenAI keys here if needed for AI SITREP
+      # ANTHROPIC_API_KEY=your_key_here
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - geotech-network
+
+networks:
+  geotech-network:
+    driver: bridge
