@@ -1218,6 +1218,7 @@
                         <p>
                             <!-- Corridor Selector -->
                             <select id="corridor-selector" class="corridor-selector-dropdown" style="background: var(--dark-lighter); border: 1px solid var(--border); color: var(--text-primary); padding: 5px 10px; border-radius: 6px; font-size: 13px; outline: none; font-family: 'Space Grotesk', sans-serif;">
+                                <option value="ALL">All Corridors (Global View)</option>
                                 <option value="NH-07">NH-07: Uttarakhand Himalayas</option>
                                 <option value="NH-66">NH-66: Western Ghats</option>
                                 <option value="NH-10">NH-10: Sikkim Himalayas</option>
@@ -1911,17 +1912,19 @@ Select an unstable or monitored sector above and click 'GENERATE SITREP' to prod
 
                 const preview = document.getElementById('bulletin-preview');
                 if (preview) {
+                    const status = data.overall_status || 'UNKNOWN';
+                    const critical_sectors = data.critical_sectors || [];
                     preview.innerHTML = `
-                        <div style="color: var(--primary); font-weight: bold; margin-bottom: 4px;">${data.title}</div>
-                        <div style="color: ${data.overall_status === 'CRITICAL' ? 'var(--danger)' : 'var(--success)'}; font-weight: bold; margin-bottom: 6px;">
-                            STATUS: ${data.overall_status} | MODE: ${data.mode}
+                        <div style="color: var(--primary); font-weight: bold; margin-bottom: 4px;">${data.title || 'USDMA DISASTER ADVISORY'}</div>
+                        <div style="color: ${status === 'CRITICAL' ? 'var(--danger)' : 'var(--success)'}; font-weight: bold; margin-bottom: 6px;">
+                            STATUS: ${status} | MODE: ${data.mode || 'N/A'}
                         </div>
                         <div style="color: var(--text-secondary); font-size: 11px;">
-                            CRITICAL SECTORS (${data.unstable_count}):
-                            ${data.critical_sectors.map(s => `[${s.id}] ${s.name} (FoS: ${s.fos_min})`).join(', ') || 'None (All Nominal)'}
+                            CRITICAL SECTORS (${data.unstable_count || critical_sectors.length}):
+                            ${critical_sectors.map(s => `[${s.id}] ${s.name} (FoS: ${s.fos_min})`).join(', ') || 'None (All Nominal)'}
                         </div>
                         <div style="color: var(--warning); margin-top: 6px; font-size: 11px;">
-                            DIRECTIVE: ${data.critical_sectors.length > 0 ? 'IMMEDIATE HIGHWAY CLOSURE & EVACUATION' : 'NORMAL MONITORING'}
+                            DIRECTIVE: ${critical_sectors.length > 0 ? 'IMMEDIATE HIGHWAY CLOSURE & EVACUATION' : 'NORMAL MONITORING'}
                         </div>
                     `;
                 }

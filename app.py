@@ -1,6 +1,7 @@
 import os
 import math
 import time
+import json
 import random
 import threading
 import urllib.parse
@@ -741,6 +742,7 @@ def update_system_data():
     """
     seismic_events = fetch_live_usgs_earthquakes()
     system_state["seismic_events"] = seismic_events
+    system_state["latest_earthquakes"] = seismic_events
 
     for corridor_id, cfg in CORRIDORS_CONFIG.items():
         corridor_segments = []
@@ -843,11 +845,6 @@ def update_system_data():
             "max_elev": max(s["elevation"] for s in system_state["segments"]),
             "avg_slope": round(sum(s["slope"]["beta_deg"] for s in system_state["segments"]) / len(system_state["segments"]), 1)
         }
-
-
-
-def fetch_live_usgs_earthquakes():
-    return system_state.get('latest_earthquakes', [])
 
 
 # Background worker lock
@@ -999,7 +996,7 @@ def generate_sitrep():
                 "content-type": "application/json"
             }
             payload = {
-                "model": "claude-3-haiku-20240307",
+                "model": "claude-3-5-haiku-20241022",
                 "max_tokens": 800,
                 "system": "You are a senior Geotechnical Military Engineer for the Border Roads Organisation (BRO). Generate a highly structured, tactical Situation Report (SITREP) based on the telemetry provided.",
                 "messages": [
@@ -1080,7 +1077,7 @@ def get_segments():
 def get_earthquakes():
     quakes = system_state.get("latest_earthquakes")
     if not quakes:
-        quakes = fetch_usgs_earthquakes()
+        quakes = fetch_live_usgs_earthquakes()
     return jsonify({
         "status": "live",
         "feed": "USGS Real-Time Earthquake GeoJSON",
@@ -1310,10 +1307,9 @@ def assess_point():
         # Query Open-Meteo live for this point
         try:
             url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&hourly=precipitation,rain,temperature_2m&current=temperature_2m,relative_humidity_2m,precipitation,surface_pressure,wind_speed_10m,wind_direction_10m&timezone=auto&forecast_days=2"
-            req = urllib.request.Request(url, headers={'User-Agent': 'JANRAKSHAK-India-LEWS/2.0'})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                if resp.status == 200:
-                    wdata = json.loads(resp.read().decode('utf-8'))
+            resp = requests.get(url, timeout=3, headers={'User-Agent': 'JANRAKSHAK-India-LEWS/2.0'})
+            if resp.status_code == 200:
+                    wdata = resp.json()
                     current = wdata.get('current', {})
                     temp_c = float(current.get('temperature_2m', 19.5))
                     humidity_pct = float(current.get('relative_humidity_2m', 78.0))
@@ -1703,7 +1699,7 @@ def get_radar_data():
 @app.route('/api/refresh', methods=['POST'])
 def refresh():
     update_system_data()
-    fetch_usgs_earthquakes()
+    fetch_live_usgs_earthquakes()
     socketio.emit('data_update', {
         'segments': system_state["segments"],
         'thresholds': system_state["thresholds"],
@@ -1725,7 +1721,7 @@ def soil_classes():
 @app.route('/api/thresholds', methods=['GET', 'POST'])
 def thresholds():
     if request.method == 'POST':
-        data = request.json
+        data = request.get_json(silent=True) or {}
         system_state["thresholds"]["unstable"] = float(data.get('unstable', 1.0))
         system_state["thresholds"]["marginal"] = float(data.get('marginal', 1.35))
         update_system_data()
@@ -1735,7 +1731,7 @@ def thresholds():
 @app.route('/api/incidents', methods=['GET', 'POST'])
 def incidents():
     if request.method == 'POST':
-        data = request.json
+        data = request.get_json(silent=True) or {}
         data['timestamp'] = datetime.now().isoformat()
         system_state["incidents"].append(data)
         return jsonify({"status": "logged"})
@@ -1852,6 +1848,21 @@ def select_corridor():
     """
     data = request.json or {}
     c_id = data.get('corridor_id')
+
+    if c_id == "ALL":
+        system_state["active_corridor"] = "ALL"
+        all_segments = []
+        for corridor_data in system_state["corridors_data"].values():
+            all_segments.extend(corridor_data.get("segments", []))
+        system_state["segments"] = all_segments
+        if system_state["segments"]:
+            system_state["dem_stats"] = {
+                "min_elev": min(s["elevation"] for s in system_state["segments"]),
+                "max_elev": max(s["elevation"] for s in system_state["segments"]),
+                "avg_slope": round(sum(s["slope"]["beta_deg"] for s in system_state["segments"]) / len(system_state["segments"]), 1)
+            }
+        return jsonify({"status": "selected", "active_corridor": c_id})
+
     if c_id in CORRIDORS_CONFIG:
         system_state["active_corridor"] = c_id
         system_state["segments"] = system_state["corridors_data"].get(c_id, {}).get("segments", [])
@@ -1872,6 +1883,15 @@ def get_evacuation_route():
     """
     data = request.json or {}
     corridor_id = data.get("corridor_id", system_state["active_corridor"])
+
+    if corridor_id == "ALL":
+        return jsonify({
+            "status": "bypassed",
+            "waypoints": [],
+            "distance_km": 0,
+            "blocked_nodes": []
+        })
+
     blocked = data.get("blocked_segments", [])
 
     # If no blocked segments provided, automatically pick UNSTABLE segments
@@ -1975,6 +1995,17 @@ def get_bulletin():
             "recommended_action": "IMMEDIATE EVACUATION & HIGHWAY CLOSURE"
         })
 
+    # Determine overall status based on sector risk counts
+    if unstable:
+        overall_status = "CRITICAL"
+        disclaimer = "Immediate evacuation and highway closures are recommended for unstable sectors."
+    elif marginal:
+        overall_status = "ELEVATED"
+        disclaimer = "Monitor marginal sectors closely; conditions may worsen."
+    else:
+        overall_status = "NOMINAL"
+        disclaimer = "All sectors are within acceptable risk thresholds."
+
     return jsonify({
         "title": "USDMA DISASTER ADVISORY BULLETIN #2026-GEO",
         "issuing_authority": "Uttarakhand State Disaster Management Authority (USDMA)",
@@ -1986,7 +2017,9 @@ def get_bulletin():
         "unstable_count": len(unstable),
         "marginal_count": len(marginal),
         "seismic_active": system_state["earthquake_mode"],
-        "seismic_pga_g": max([s.get('seismic', {}).get('pga_g', 0.0) for s in segs]) if segs else 0.0
+        "seismic_pga_g": max([s.get('seismic', {}).get('pga_g', 0.0) for s in segs]) if segs else 0.0,
+        "overall_status": overall_status,
+        "disclaimer": disclaimer
     })
 
 @socketio.on('connect')

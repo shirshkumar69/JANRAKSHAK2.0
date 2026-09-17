@@ -1410,7 +1410,7 @@
                             backgroundColor: COLORS.danger,
                             borderColor: '#ffffff',
                             borderWidth: 1.5,
-                            pointRadius: p => 6 + (p.raw?.rain ? Math.min(8, p.raw.rain / 15) : 3),
+                            pointRadius: context => 6 + (context.raw?.rain ? Math.min(8, context.raw.rain / 15) : 3),
                             pointHoverRadius: 10
                         },
                         {
@@ -1419,7 +1419,7 @@
                             backgroundColor: COLORS.warning,
                             borderColor: '#ffffff',
                             borderWidth: 1.5,
-                            pointRadius: p => 6 + (p.raw?.rain ? Math.min(8, p.raw.rain / 15) : 3),
+                            pointRadius: context => 6 + (context.raw?.rain ? Math.min(8, context.raw.rain / 15) : 3),
                             pointHoverRadius: 10
                         },
                         {
@@ -1428,7 +1428,7 @@
                             backgroundColor: COLORS.success,
                             borderColor: '#ffffff',
                             borderWidth: 1.5,
-                            pointRadius: p => 6 + (p.raw?.rain ? Math.min(8, p.raw.rain / 15) : 3),
+                            pointRadius: context => 6 + (context.raw?.rain ? Math.min(8, context.raw.rain / 15) : 3),
                             pointHoverRadius: 10
                         }
                     ]
@@ -1494,12 +1494,12 @@
 
         // Update UI Statistics
         function updateSummaryCards(summary) {
-            document.getElementById('stat-avg-fos').textContent = (summary.avg_fos !== undefined) ? summary.avg_fos.toFixed(2) : '--';
-            document.getElementById('stat-min-fos').textContent = (summary.min_fos !== undefined) ? summary.min_fos.toFixed(2) : '--';
-            document.getElementById('stat-max-fos').textContent = (summary.max_fos !== undefined) ? summary.max_fos.toFixed(2) : '--';
-            document.getElementById('stat-avg-rain').innerHTML = `${summary.avg_rainfall !== undefined ? summary.avg_rainfall.toFixed(1) : '--'} <span class="stat-unit">mm</span>`;
-            document.getElementById('stat-total-rain').innerHTML = `${summary.total_rainfall !== undefined ? summary.total_rainfall.toFixed(1) : '--'} <span class="stat-unit">mm</span>`;
-            document.getElementById('stat-max-rain').innerHTML = `${summary.max_rainfall !== undefined ? summary.max_rainfall.toFixed(1) : '--'} <span class="stat-unit">mm</span>`;
+            document.getElementById('stat-avg-fos').textContent = (summary.avg_fos != null) ? summary.avg_fos.toFixed(2) : '--';
+            document.getElementById('stat-min-fos').textContent = (summary.min_fos != null) ? summary.min_fos.toFixed(2) : '--';
+            document.getElementById('stat-max-fos').textContent = (summary.max_fos != null) ? summary.max_fos.toFixed(2) : '--';
+            document.getElementById('stat-avg-rain').innerHTML = `${summary.avg_rainfall != null ? summary.avg_rainfall.toFixed(1) : '--'} <span class="stat-unit">mm</span>`;
+            document.getElementById('stat-total-rain').innerHTML = `${summary.total_rainfall != null ? summary.total_rainfall.toFixed(1) : '--'} <span class="stat-unit">mm</span>`;
+            document.getElementById('stat-max-rain').innerHTML = `${summary.max_rainfall != null ? summary.max_rainfall.toFixed(1) : '--'} <span class="stat-unit">mm</span>`;
 
             // Counts
             document.getElementById('count-unstable').textContent = summary.unstable_count || 0;

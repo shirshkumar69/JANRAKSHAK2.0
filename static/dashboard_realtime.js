@@ -21,6 +21,7 @@
     let markers = new Map();
     let pulseMarkers = new Map();
     let isConnected = false;
+    let needsMapRecenter = true;
 
     // Initialize WebSocket
     function initWebSocket() {
@@ -84,12 +85,12 @@
 
     function applyForecastAndRender() {
         if (!globalSegments) return;
-        
+
         const renderedSegments = globalSegments.map(seg => {
-            const pd = (seg.predictive_72h && seg.predictive_72h[`${currentForecastHour}h`]) 
-                ? seg.predictive_72h[`${currentForecastHour}h`] 
-                : { fos: seg.fos.min, risk_level: seg.risk_level, accum_rain_mm: (seg.rainfall.accum_24h_mm || 0) };
-            
+            const pd = (seg.predictive_72h && seg.predictive_72h[`${currentForecastHour}h`])
+                ? seg.predictive_72h[`${currentForecastHour}h`]
+                : { fos: seg.fos?.min ?? 1.5, risk_level: seg.risk_level ?? 'STABLE', accum_rain_mm: (seg.rainfall?.accum_24h_mm || 0) };
+
             return {
                 ...seg,
                 rendered_fos: pd.fos,
@@ -101,7 +102,7 @@
         updateDashboardMetrics(renderedSegments, currentSimState);
         updateMapMarkers(renderedSegments);
         updateHazardTable(renderedSegments);
-        
+
         fetchEvacuationRoute();
     }
 
@@ -281,10 +282,23 @@
     function updateMapMarkers(segments) {
         if (!map) return;
 
+        // Clear markers that are no longer in the current segments list
+        const incomingIds = new Set(segments.map(s => s.id));
+        for (const [id, marker] of markers.entries()) {
+            if (!incomingIds.has(id)) {
+                map.removeLayer(marker);
+                markers.delete(id);
+                removePulseEffect(id);
+            }
+        }
+
+        const bounds = L.latLngBounds();
+
         segments.forEach(segment => {
             const riskLbl = segment.rendered_risk || segment.risk_level;
             const color = getRiskColor(riskLbl);
             const coords = [segment.coords[0], segment.coords[1]];
+            bounds.extend(coords);
 
             let marker = markers.get(segment.id);
 
@@ -319,13 +333,20 @@
                 }
             }
         });
+
+        if (needsMapRecenter && segments.length > 0) {
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+            needsMapRecenter = false;
+        }
     }
 
     function createPopupContent(segment) {
         const riskLbl = segment.rendered_risk || segment.risk_level;
         const color = getRiskColor(riskLbl);
-        const fosVal = (segment.rendered_fos !== undefined ? segment.rendered_fos : segment.fos.min).toFixed(2);
-        const rainVal = (segment.rendered_rain !== undefined ? segment.rendered_rain : segment.rainfall.accum_24h_mm).toFixed(1);
+        const fosVal = (segment.rendered_fos !== undefined ? segment.rendered_fos : (segment.fos?.min ?? 0)).toFixed(2);
+        const rainVal = (segment.rendered_rain !== undefined ? segment.rendered_rain : (segment.rainfall?.accum_24h_mm || 0)).toFixed(1);
+        const slopeDeg = segment.slope?.beta_deg ?? 'N/A';
+        const elevation = segment.elevation ?? 'N/A';
 
         return `
             <div style="font-family: 'Space Grotesk', sans-serif; min-width: 220px; padding: 6px; color: #0f172a;">
@@ -347,10 +368,10 @@
                     </div>
                 </div>
                 <div style="font-size: 11px; color: #475569; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; justify-content: space-between;">
-                    <span>Slope: <strong>${segment.slope.beta_deg}°</strong></span>
-                    <span>Elevation: <strong>${segment.elevation}m</strong></span>
+                    <span>Slope: <strong>${slopeDeg}°</strong></span>
+                    <span>Elevation: <strong>${elevation}m</strong></span>
                 </div>
-                <button onclick="window.loadSectorIntoSimulator('${segment.id}', ${segment.slope.beta_deg}, ${rainVal})"
+                <button onclick="window.loadSectorIntoSimulator('${segment.id}', ${slopeDeg}, ${rainVal})"
                     style="margin-top: 8px; width: 100%; padding: 6px; font-size: 11px; background: #0a0e1a; color: #00d9ff; border: 1px solid #00d9ff; border-radius: 4px; cursor: pointer; font-weight: 600;">
                     Load into Physics Simulator ↗
                 </button>
@@ -412,14 +433,15 @@
         if (!tableBody) return;
 
         // Sort by Factor of Safety (most critical first)
-        const sorted = [...segments].sort((a, b) => (a.rendered_fos !== undefined ? a.rendered_fos : a.fos.min) - (b.rendered_fos !== undefined ? b.rendered_fos : b.fos.min));
+        const sorted = [...segments].sort((a, b) => (a.rendered_fos !== undefined ? a.rendered_fos : (a.fos?.min ?? 99)) - (b.rendered_fos !== undefined ? b.rendered_fos : (b.fos?.min ?? 99)));
 
         tableBody.innerHTML = sorted.map(s => {
             const riskLbl = s.rendered_risk || s.risk_level;
             const color = getRiskColor(riskLbl);
-            const fosVal = (s.rendered_fos !== undefined ? s.rendered_fos : s.fos.min).toFixed(2);
-            const rainVal = (s.rendered_rain !== undefined ? s.rendered_rain : s.rainfall.accum_24h_mm).toFixed(1);
+            const fosVal = (s.rendered_fos !== undefined ? s.rendered_fos : (s.fos?.min ?? 0)).toFixed(2);
+            const rainVal = (s.rendered_rain !== undefined ? s.rendered_rain : (s.rainfall?.accum_24h_mm || 0)).toFixed(1);
             const soilName = (s.soil && s.soil.name) ? s.soil.name : 'Colluvium / Schist';
+            const slopeDeg = s.slope?.beta_deg ?? 'N/A';
             return `
                 <tr>
                     <td><span class="sector-id">${s.id}</span></td>
@@ -571,13 +593,26 @@
     if (corridorSelector) {
         corridorSelector.addEventListener('change', async (e) => {
             currentCorridor = e.target.value;
+            needsMapRecenter = true;
             try {
                 await fetch('/api/corridors/select', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ corridor_id: currentCorridor })
                 });
-                socket.emit('request_update');
+                if (socket && isConnected) {
+                    socket.emit('request_update');
+                } else {
+                    // Fallback if websocket is disconnected
+                    fetch('/api/segments')
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.segments) {
+                                globalSegments = data.segments;
+                                applyForecastAndRender();
+                            }
+                        }).catch(e => console.warn('Polling fallback failed on corridor switch', e));
+                }
             } catch(err) {
                 console.error("Failed to swap corridor:", err);
             }
@@ -752,8 +787,8 @@
                 let pressure = (targetSeg.rainfall && targetSeg.rainfall.pressure_msl) ? targetSeg.rainfall.pressure_msl + 'hPa' : 'N/A';
                 let temp = (targetSeg.rainfall && targetSeg.rainfall.temperature) ? targetSeg.rainfall.temperature + '°C' : 'N/A';
 
-                const r_fos = targetSeg.rendered_fos !== undefined ? targetSeg.rendered_fos : targetSeg.fos.min;
-                const r_rain = targetSeg.rendered_rain !== undefined ? targetSeg.rendered_rain : targetSeg.rainfall.accum_24h_mm;
+                const r_fos = targetSeg.rendered_fos !== undefined ? targetSeg.rendered_fos : (targetSeg.fos?.min ?? 0);
+                const r_rain = targetSeg.rendered_rain !== undefined ? targetSeg.rendered_rain : (targetSeg.rainfall?.accum_24h_mm || 0);
 
                 simLines.push(`[MET] Rain: ${r_rain}mm | Wind: ${wind} | Press: ${pressure} | Temp: ${temp} | FoS: ${r_fos.toFixed(2)}`);
             } else {
@@ -836,8 +871,8 @@
 
                 if (unstable.length > 0) {
                     printTargetsTable.innerHTML = unstable.map(s => {
-                        const fos = s.rendered_fos !== undefined ? s.rendered_fos : s.fos.min;
-                        const rain = s.rendered_rain !== undefined ? s.rendered_rain : s.rainfall.accum_24h_mm;
+                        const fos = s.rendered_fos !== undefined ? s.rendered_fos : (s.fos?.min ?? 0);
+                        const rain = s.rendered_rain !== undefined ? s.rendered_rain : (s.rainfall?.accum_24h_mm || 0);
                         const risk = s.rendered_risk || s.risk_level;
                         return `
                             <tr>
@@ -862,7 +897,8 @@
                 const ogText = authDispatchBtn.innerHTML;
                 authDispatchBtn.innerHTML = 'TRANSMITTING COMMANDS...';
                 fetch('/api/dispatch', { method: 'POST' })
-                    .then(() => {
+                    .then((res) => {
+                        if (!res.ok) throw new Error('Dispatch failed');
                         authDispatchBtn.innerHTML = 'DISPATCH COMPLETED ✓';
                         setTimeout(() => {
                             authDispatchBtn.innerHTML = ogText;
@@ -956,11 +992,11 @@
 
         const payload = {
             sector_id: sector.id,
-            fos: sector.rendered_fos !== undefined ? sector.rendered_fos : sector.fos.min,
-            rain_24h: sector.rendered_rain !== undefined ? sector.rendered_rain : sector.rainfall.accum_24h_mm,
-            slope_angle: 42.5, // Default/Sim
+            fos: sector.rendered_fos !== undefined ? sector.rendered_fos : (sector.fos?.min ?? 0),
+            rain_24h: sector.rendered_rain !== undefined ? sector.rendered_rain : (sector.rainfall?.accum_24h_mm || 0),
+            slope_angle: sector.slope?.beta_deg ?? 42.5,
             seismic_pga: (window._currentSimConfig && window._currentSimConfig.kh) ? window._currentSimConfig.kh : 0.05,
-            soil_type: sector.geotech.lithology_id || "Fractured Rock"
+            soil_type: sector.geotech?.lithology_id || "Fractured Rock"
         };
 
         try {
@@ -1424,6 +1460,9 @@
         draw();
     }
 
+    // Expose appMap to window for global access
+    window.appMap = map;
+
     // Public API
     window.JANRAKSHAK_RT = {
         requestUpdate: () => socket && socket.emit('request_update'),
@@ -1449,7 +1488,17 @@
 
     // Polling fallback every 20 seconds
     setInterval(() => {
-        if (isConnected && socket) {
+        if (!isConnected) {
+            console.log('[JANRAKSHAK] Polling fallback active (WebSocket disconnected)...');
+            fetch('/api/segments')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.segments) {
+                        globalSegments = data.segments;
+                        applyForecastAndRender();
+                    }
+                }).catch(e => console.warn('Polling fallback failed', e));
+        } else if (socket) {
             socket.emit('request_update');
         }
     }, 20000);

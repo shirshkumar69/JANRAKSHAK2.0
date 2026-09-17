@@ -660,7 +660,11 @@
         }
 
         function build3DTerrainMesh(lat, lng, baseElev = 1420) {
-            if (terrainMesh) scene.remove(terrainMesh);
+            if (terrainMesh) {
+                scene.remove(terrainMesh);
+                if (terrainMesh.geometry) terrainMesh.geometry.dispose();
+                if (terrainMesh.material) terrainMesh.material.dispose();
+            }
 
             const width = 100, height = 100;
             const geom = new THREE.PlaneGeometry(130, 130, width - 1, height - 1);
@@ -765,7 +769,7 @@
                                 <div>24h Rain: <strong>${data.weather.rainfall_24h_mm}mm</strong></div>
                                 <div>FoS: <strong style="color:${data.geotechnical.badge_color};">${data.geotechnical.factor_of_safety}</strong></div>
                             </div>
-                            <button onclick="rebuild3DForPoint(${lat}, ${lng}, ${data.elevation_m}, '${data.location_label}')"
+                            <button onclick="rebuild3DForPoint(${lat}, ${lng}, ${data.elevation_m}, '${data.location_label.replace(/'/g, "\\'")}')"
                                 style="width:100%; padding:6px; background:#070a12; color:#00d9ff; border:1px solid #00d9ff; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">
                                 ⚡ Generate 3D Topography Mesh ↗
                             </button>
@@ -1021,7 +1025,7 @@
             if (autoRotate && camera) {
                 const radius = camera.position.length();
                 let theta = Math.atan2(camera.position.x, camera.position.z) + 0.005;
-                const phi = Math.acos(camera.position.y / radius);
+                const phi = Math.acos(Math.max(-1, Math.min(1, camera.position.y / radius)));
                 camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
                 camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
                 camera.lookAt(0, 0, 0);

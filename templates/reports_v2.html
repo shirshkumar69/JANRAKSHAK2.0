@@ -1115,26 +1115,27 @@
                 const response = await fetch('/api/bulletin');
                 const data = await response.json();
 
-                document.getElementById('bulletin-title').textContent = data.title;
-                document.getElementById('bulletin-authority').textContent = data.issuing_authority;
-                document.getElementById('bulletin-timestamp').textContent = `Issued: ${data.timestamp} · ${data.mode}`;
-                document.getElementById('bulletin-corridor').textContent = `Corridor: ${data.corridor}`;
-                document.getElementById('bulletin-disclaimer').textContent = data.disclaimer;
+                document.getElementById('bulletin-title').textContent = data.title || 'USDMA DISASTER ADVISORY';
+                document.getElementById('bulletin-authority').textContent = data.issuing_authority || 'USDMA';
+                document.getElementById('bulletin-timestamp').textContent = `Issued: ${data.timestamp} · ${data.mode || 'N/A'}`;
+                document.getElementById('bulletin-corridor').textContent = `Corridor: ${data.corridor || 'NH-07'}`;
+                document.getElementById('bulletin-disclaimer').textContent = data.disclaimer || 'Information is provided for situational awareness.';
 
                 // Status
                 const statusEl = document.getElementById('bulletin-status');
-                statusEl.textContent = data.overall_status;
-                statusEl.className = data.overall_status === 'CRITICAL' ? 'bulletin-status status-critical' : 'bulletin-status status-nominal';
+                const status = data.overall_status || 'UNKNOWN';
+                statusEl.textContent = status;
+                statusEl.className = status === 'CRITICAL' ? 'bulletin-status status-critical' : 'bulletin-status status-nominal';
 
                 // Summary
-                const stable = data.total_monitored_sectors - data.unstable_count - data.marginal_count;
+                const stable = (data.total_monitored_sectors || 0) - (data.unstable_count || 0) - (data.marginal_count || 0);
                 document.getElementById('bulletin-summary').innerHTML = `
                     <div class="summary-item">
-                        <div class="summary-value" style="color: var(--danger);">${data.unstable_count}</div>
+                        <div class="summary-value" style="color: var(--danger);">${data.unstable_count || 0}</div>
                         <div class="summary-label">Unstable</div>
                     </div>
                     <div class="summary-item">
-                        <div class="summary-value" style="color: var(--warning);">${data.marginal_count}</div>
+                        <div class="summary-value" style="color: var(--warning);">${data.marginal_count || 0}</div>
                         <div class="summary-label">Marginal</div>
                     </div>
                     <div class="summary-item">
@@ -1142,29 +1143,30 @@
                         <div class="summary-label">Stable</div>
                     </div>
                     <div class="summary-item">
-                        <div class="summary-value">${data.total_monitored_sectors}</div>
+                        <div class="summary-value">${data.total_monitored_sectors || 0}</div>
                         <div class="summary-label">Total Monitored</div>
                     </div>
                 `;
 
                 // Critical sectors
                 const sectorsEl = document.getElementById('critical-sectors');
-                if (data.critical_sectors.length === 0) {
+                const critical_sectors = data.critical_sectors || [];
+                if (critical_sectors.length === 0) {
                     sectorsEl.innerHTML = '<h3 style="font-family: \'Space Grotesk\', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 16px;">Critical Sectors Requiring Immediate Action</h3><p style="text-align: center; color: var(--text-secondary); padding: 20px;">No critical sectors at this time</p>';
                 } else {
                     let sectorsHTML = '<h3 style="font-family: \'Space Grotesk\', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 16px;">Critical Sectors Requiring Immediate Action</h3>';
-                    data.critical_sectors.forEach(sector => {
+                    critical_sectors.forEach(sector => {
                         sectorsHTML += `
                             <div class="sector-item">
                                 <div class="sector-header">
                                     <div class="sector-name">${sector.id} - ${sector.name} (${sector.km})</div>
-                                    <div class="sector-fos">FoS: ${sector.fos_min.toFixed(2)}</div>
+                                    <div class="sector-fos">FoS: ${(sector.fos_min || 0).toFixed(2)}</div>
                                 </div>
                                 <div class="sector-details">
-                                    <div class="detail-item">24H Rainfall: <strong>${sector.rain_24h_mm.toFixed(1)} mm</strong></div>
-                                    <div class="detail-item">Saturation: <strong>${(sector.saturation_ratio * 100).toFixed(1)}%</strong></div>
+                                    <div class="detail-item">24H Rainfall: <strong>${(sector.rain_24h_mm || 0).toFixed(1)} mm</strong></div>
+                                    <div class="detail-item">Saturation: <strong>${((sector.saturation_ratio || 0) * 100).toFixed(1)}%</strong></div>
                                 </div>
-                                <div class="sector-action">⚠ ${sector.recommended_action}</div>
+                                <div class="sector-action">⚠ ${sector.recommended_action || 'Evacuate immediately'}</div>
                             </div>
                         `;
                     });

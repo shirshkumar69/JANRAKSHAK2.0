@@ -1255,6 +1255,11 @@
             const unstable = parseFloat(document.getElementById('unstableSlider').value);
             const marginal = parseFloat(document.getElementById('marginalSlider').value);
 
+            if (unstable >= marginal) {
+                showToast('Error: Unstable threshold must be less than marginal threshold');
+                return;
+            }
+
             try {
                 const response = await fetch('/api/settings', {
                     method: 'POST',
